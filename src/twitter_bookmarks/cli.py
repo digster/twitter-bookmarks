@@ -1,0 +1,195 @@
+"""CLI interface for twitter-bookmarks.
+
+Commands:
+    setup   - Configure Twitter auth credentials
+    fetch   - Fetch bookmarks and save to markdown
+    status  - Show current backup status
+"""
+
+import sys
+from pathlib import Path
+
+import click
+
+from .config import (
+    CONFIG_FILE,
+    AppConfig,
+    AuthConfig,
+    config_exists,
+    load_config,
+    save_config,
+)
+from .logging_config import setup_logging
+
+
+@click.group()
+@click.option("--verbose", "-v", is_flag=True, help="Enable debug logging")
+@click.option("--config", type=click.Path(), default=None, help="Config file path")
+@click.pass_context
+def main(ctx, verbose, config):
+    """Twitter/X Bookmarks Backup — Save your bookmarks to markdown."""
+    setup_logging(debug=verbose)
+    ctx.ensure_object(dict)
+    ctx.obj["config_path"] = Path(config) if config else CONFIG_FILE
+
+
+@main.command()
+@click.option(
+    "--query-id-only",
+    is_flag=True,
+    help="Only update the GraphQL query ID (keep existing auth)",
+)
+@click.pass_context
+def setup(ctx, query_id_only):
+    """Configure Twitter authentication credentials."""
+    config_path = ctx.obj["config_path"]
+
+    if query_id_only:
+        if not config_exists(config_path):
+            click.echo("Error: No config found. Run setup without --query-id-only first.", err=True)
+            sys.exit(1)
+        config = load_config(config_path)
+        click.echo("Update GraphQL Query ID")
+        click.echo("=" * 40)
+        click.echo("Open x.com/i/bookmarks → DevTools → Network → filter 'Bookmarks'")
+        click.echo("Copy the ID between /graphql/ and /Bookmarks in the request URL.")
+        click.echo()
+        query_id = click.prompt("query_id")
+        config.query_id = query_id
+        save_config(config, config_path)
+        click.echo(f"\nQuery ID updated in {config_path}")
+        return
+
+    click.echo("Twitter Bookmarks Backup — Setup")
+    click.echo("=" * 40)
+    click.echo()
+    click.echo("You need your Twitter/X session cookies.")
+    click.echo("To get them:")
+    click.echo("  1. Open x.com in your browser and log in")
+    click.echo("  2. Open DevTools (F12) -> Application -> Cookies -> https://x.com")
+    click.echo("  3. Copy the values of 'auth_token' and 'ct0'")
+    click.echo()
+
+    auth_token = click.prompt("auth_token", hide_input=True)
+    ct0 = click.prompt("ct0", hide_input=True)
+
+    click.echo()
+    click.echo("(Optional) GraphQL query ID — press Enter to skip and use default.")
+    click.echo("If you get 404 errors, you'll need to provide this.")
+    query_id = click.prompt("query_id", default="", show_default=False)
+
+    config = AppConfig(
+        auth=AuthConfig(auth_token=auth_token, ct0=ct0),
+        query_id=query_id or None,
+    )
+
+    save_config(config, config_path)
+    click.echo(f"\nConfig saved to {config_path}")
+    click.echo("Run 'twitter-bookmarks fetch' to download your bookmarks.")
+
+
+@main.command()
+@click.option("--full", is_flag=True, help="Re-fetch all (ignore state)")
+@click.option("--max-pages", default=50, help="Maximum pages to fetch")
+@click.option("-o", "--output", type=click.Path(), default=None, help="Output file")
+@click.option(
+    "-n", "--count", type=int, default=None, help="Number of latest bookmarks to fetch"
+)
+@click.option(
+    "--delay", type=float, default=None, help="Delay in seconds between API requests"
+)
+@click.pass_context
+def fetch(ctx, full, max_pages, output, count, delay):
+    """Fetch bookmarks and save to markdown."""
+    config_path = ctx.obj["config_path"]
+    if not config_exists(config_path):
+        click.echo(
+            "Error: No config found. Run 'twitter-bookmarks setup' first.",
+            err=True,
+        )
+        sys.exit(1)
+
+    config = load_config(config_path)
+    output_path = Path(output) if output else config.bookmarks_file
+
+    # Lazy imports so --help stays fast
+    from .client import TwitterClient
+    from .markdown import render_bookmarks_file
+    from .parser import parse_bookmarks
+    from .state import StateManager
+
+    state = StateManager(config.state_dir)
+
+    if full:
+        click.echo("Full fetch mode — ignoring previous state.")
+        state.reset()
+
+    # Resolve delay: CLI flag > config > 0 (no delay)
+    effective_delay = delay if delay is not None else config.fetch_delay
+
+    # Fetch from Twitter API
+    click.echo("Fetching bookmarks from Twitter/X...")
+    try:
+        with TwitterClient(config.auth.auth_token, config.auth.ct0, query_id=config.query_id) as client:
+            raw_entries = client.fetch_all_bookmarks(
+                max_pages=max_pages,
+                delay=effective_delay,
+                max_count=count,
+            )
+    except RuntimeError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+    click.echo(f"Fetched {len(raw_entries)} raw entries.")
+
+    # Parse into structured data
+    bookmarks = parse_bookmarks(raw_entries)
+    if count is not None:
+        bookmarks = bookmarks[:count]
+    click.echo(f"Parsed {len(bookmarks)} valid bookmarks.")
+
+    # Log new vs already-seen
+    new_bookmarks = state.filter_new(bookmarks)
+    if not full and not new_bookmarks:
+        click.echo("No new bookmarks since last fetch.")
+    else:
+        click.echo(f"{len(new_bookmarks)} new bookmarks.")
+
+    # Always write the full set (API returns all bookmarks)
+    markdown = render_bookmarks_file(bookmarks)
+    output_path.write_text(markdown, encoding="utf-8")
+    click.echo(f"Wrote {len(bookmarks)} bookmarks to {output_path}")
+
+    # Update state
+    state.mark_all_processed(bookmarks)
+    state.save()
+
+
+@main.command()
+@click.pass_context
+def status(ctx):
+    """Show current backup status."""
+    config_path = ctx.obj["config_path"]
+    has_config = config_exists(config_path)
+
+    click.echo("Twitter Bookmarks Backup — Status")
+    click.echo("=" * 40)
+    click.echo(f"Config: {'Found' if has_config else 'Not configured'} ({config_path})")
+
+    if not has_config:
+        click.echo("\nRun 'twitter-bookmarks setup' to get started.")
+        return
+
+    config = load_config(config_path)
+
+    from .state import StateManager
+
+    state = StateManager(config.state_dir)
+    click.echo(f"Processed bookmarks: {state.count}")
+    click.echo(f"Output file: {config.bookmarks_file}")
+
+    if config.bookmarks_file.exists():
+        size = config.bookmarks_file.stat().st_size
+        click.echo(f"Output file size: {size:,} bytes")
+    else:
+        click.echo("Output file: Not yet created")

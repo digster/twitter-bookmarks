@@ -1,0 +1,185 @@
+{
+  "data": {
+    "bookmark_timeline_v2": {
+      "timeline": {
+        "instructions": [
+          {
+            "type": "TimelineAddEntries",
+            "entries": [
+              {
+                "entryId": "tweet-1234567890",
+                "sortIndex": "1234567890",
+                "content": {
+                  "entryType": "TimelineTimelineItem",
+                  "itemContent": {
+                    "itemType": "TimelineTweet",
+                    "tweet_results": {
+                      "result": {
+                        "__typename": "Tweet",
+                        "rest_id": "1234567890",
+                        "core": {
+                          "user_results": {
+                            "result": {
+                              "rest_id": "111111",
+                              "legacy": {
+                                "screen_name": "testuser",
+                                "name": "Test User"
+                              }
+                            }
+                          }
+                        },
+                        "legacy": {
+                          "full_text": "This is a test tweet with a link https://t.co/abc123",
+                          "created_at": "Mon Feb 10 18:30:00 +0000 2025",
+                          "lang": "en",
+                          "entities": {
+                            "urls": [
+                              {
+                                "url": "https://t.co/abc123",
+                                "expanded_url": "https://example.com/article",
+                                "display_url": "example.com/article",
+                                "indices": [36, 56]
+                              }
+                            ],
+                            "media": []
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "entryId": "tweet-9876543210",
+                "sortIndex": "9876543210",
+                "content": {
+                  "entryType": "TimelineTimelineItem",
+                  "itemContent": {
+                    "itemType": "TimelineTweet",
+                    "tweet_results": {
+                      "result": {
+                        "__typename": "Tweet",
+                        "rest_id": "9876543210",
+                        "core": {
+                          "user_results": {
+                            "result": {
+                              "rest_id": "222222",
+                              "legacy": {
+                                "screen_name": "photouser",
+                                "name": "Photo User"
+                              }
+                            }
+                          }
+                        },
+                        "legacy": {
+                          "full_text": "Check out this image https://t.co/img456",
+                          "created_at": "Sun Feb 09 12:00:00 +0000 2025",
+                          "lang": "en",
+                          "entities": {
+                            "urls": [],
+                            "media": [
+                              {
+                                "type": "photo",
+                                "url": "https://t.co/img456",
+                                "media_url_https": "https://pbs.twimg.com/media/test123.jpg",
+                                "expanded_url": "https://x.com/photouser/status/9876543210/photo/1",
+                                "indices": [21, 44]
+                              }
+                            ]
+                          },
+                          "extended_entities": {
+                            "media": [
+                              {
+                                "type": "photo",
+                                "url": "https://t.co/img456",
+                                "media_url_https": "https://pbs.twimg.com/media/test123.jpg",
+                                "expanded_url": "https://x.com/photouser/status/9876543210/photo/1"
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "entryId": "tweet-5555555555",
+                "sortIndex": "5555555555",
+                "content": {
+                  "entryType": "TimelineTimelineItem",
+                  "itemContent": {
+                    "itemType": "TimelineTweet",
+                    "tweet_results": {
+                      "result": {
+                        "__typename": "Tweet",
+                        "rest_id": "5555555555",
+                        "core": {
+                          "user_results": {
+                            "result": {
+                              "rest_id": "333333",
+                              "legacy": {
+                                "screen_name": "quoter",
+                                "name": "The Quoter"
+                              }
+                            }
+                          }
+                        },
+                        "legacy": {
+                          "full_text": "Great take on this topic",
+                          "created_at": "Sat Feb 08 09:00:00 +0000 2025",
+                          "lang": "en",
+                          "is_quote_status": true,
+                          "in_reply_to_screen_name": null,
+                          "entities": {
+                            "urls": [],
+                            "media": []
+                          }
+                        },
+                        "quoted_status_result": {
+                          "result": {
+                            "rest_id": "4444444444",
+                            "core": {
+                              "user_results": {
+                                "result": {
+                                  "legacy": {
+                                    "screen_name": "originalauthor"
+                                  }
+                                }
+                              }
+                            },
+                            "legacy": {
+                              "full_text": "Original thought here"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "entryId": "cursor-top-aaa111",
+                "sortIndex": "9999999999",
+                "content": {
+                  "entryType": "TimelineTimelineCursor",
+                  "value": "cursor_top_value_abc",
+                  "cursorType": "Top"
+                }
+              },
+              {
+                "entryId": "cursor-bottom-bbb222",
+                "sortIndex": "0000000001",
+                "content": {
+                  "entryType": "TimelineTimelineCursor",
+                  "value": "cursor_bottom_value_xyz",
+                  "cursorType": "Bottom"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}
