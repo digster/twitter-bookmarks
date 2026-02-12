@@ -76,3 +76,8 @@ class TestCLI:
         assert "--count" in result.output
         assert "-n" in result.output
         assert "--delay" in result.output
+
+    def test_fetch_help_shows_dump_raw(self, runner):
+        result = runner.invoke(main, ["fetch", "--help"])
+        assert result.exit_code == 0
+        assert "--dump-raw" in result.output

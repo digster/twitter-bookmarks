@@ -98,9 +98,17 @@ def setup(ctx, query_id_only):
 @click.option(
     "--delay", type=float, default=None, help="Delay in seconds between API requests"
 )
+@click.option(
+    "--dump-raw",
+    type=click.Path(),
+    default=None,
+    help="Save raw API JSON response to file for debugging",
+)
 @click.pass_context
-def fetch(ctx, full, max_pages, output, count, delay):
+def fetch(ctx, full, max_pages, output, count, delay, dump_raw):
     """Fetch bookmarks and save to markdown."""
+    import json as json_mod
+
     config_path = ctx.obj["config_path"]
     if not config_exists(config_path):
         click.echo(
@@ -130,12 +138,31 @@ def fetch(ctx, full, max_pages, output, count, delay):
     # Fetch from Twitter API
     click.echo("Fetching bookmarks from Twitter/X...")
     try:
-        with TwitterClient(config.auth.auth_token, config.auth.ct0, query_id=config.query_id) as client:
+        with TwitterClient(
+            config.auth.auth_token,
+            config.auth.ct0,
+            query_id=config.query_id,
+            capture_raw=bool(dump_raw),
+        ) as client:
             raw_entries = client.fetch_all_bookmarks(
                 max_pages=max_pages,
                 delay=effective_delay,
                 max_count=count,
             )
+
+            # Dump raw API responses for debugging
+            if dump_raw:
+                dump_path = Path(dump_raw)
+                dump_data = {
+                    "raw_api_responses": client.raw_responses,
+                    "raw_entries": raw_entries,
+                }
+                dump_path.write_text(
+                    json_mod.dumps(dump_data, indent=2, ensure_ascii=False),
+                    encoding="utf-8",
+                )
+                click.echo(f"Raw API response saved to {dump_path}")
+
     except RuntimeError as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)

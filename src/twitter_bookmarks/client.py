@@ -86,11 +86,19 @@ class BookmarksPage:
 class TwitterClient:
     """Client for Twitter's internal GraphQL API using cookie auth."""
 
-    def __init__(self, auth_token: str, ct0: str, query_id: str | None = None):
+    def __init__(
+        self,
+        auth_token: str,
+        ct0: str,
+        query_id: str | None = None,
+        capture_raw: bool = False,
+    ):
         self._query_id = query_id or BOOKMARKS_QUERY_ID
         self._graphql_url = (
             f"https://x.com/i/api/graphql/{self._query_id}/Bookmarks"
         )
+        self._capture_raw = capture_raw
+        self.raw_responses: list[dict] = []
         self._client = httpx.Client(
             headers={
                 "authorization": f"Bearer {BEARER_TOKEN}",
@@ -165,6 +173,9 @@ class TwitterClient:
 
         response.raise_for_status()
         data = response.json()
+
+        if self._capture_raw:
+            self.raw_responses.append(data)
 
         return self._parse_timeline_response(data)
 

@@ -1,0 +1,51 @@
+{
+  "data": {
+    "bookmark_timeline_v2": {
+      "timeline": {
+        "instructions": [
+          {
+            "type": "TimelineAddEntries",
+            "entries": [
+              {
+                "entryId": "tweet-7777777777",
+                "sortIndex": "7777777777",
+                "content": {
+                  "entryType": "TimelineTimelineItem",
+                  "itemContent": {
+                    "itemType": "TimelineTweet",
+                    "tweet_results": {
+                      "result": {
+                        "__typename": "Tweet",
+                        "rest_id": "7777777777",
+                        "core": {
+                          "user_result": {
+                            "result": {
+                              "rest_id": "999999",
+                              "legacy": {
+                                "screen_name": "singularuser",
+                                "name": "Singular User"
+                              }
+                            }
+                          }
+                        },
+                        "legacy": {
+                          "full_text": "Tweet with singular user_result key",
+                          "created_at": "Mon Feb 10 18:30:00 +0000 2025",
+                          "lang": "en",
+                          "entities": {
+                            "urls": [],
+                            "media": []
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

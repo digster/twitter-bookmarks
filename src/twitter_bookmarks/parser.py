@@ -31,6 +31,107 @@ def parse_bookmarks(raw_entries: list[dict]) -> list[Bookmark]:
     return bookmarks
 
 
+def _extract_user(tweet_result: dict, tweet_id: str = "") -> User:
+    """Extract user data from a tweet result, trying multiple known key paths.
+
+    Twitter's GraphQL schema evolves — the user object may be nested under
+    different keys depending on the API version. We try paths in order of
+    likelihood and fall back to a recursive search as a last resort.
+    """
+    core = tweet_result.get("core", {})
+    logger.debug(
+        "tweet %s: tweet_result keys=%s, core keys=%s",
+        tweet_id,
+        list(tweet_result.keys()),
+        list(core.keys()),
+    )
+
+    # Path 1: standard — core.user_results.result.legacy
+    user_results = core.get("user_results", {})
+    if user_results:
+        logger.debug("tweet %s: user_results keys=%s", tweet_id, list(user_results.keys()))
+        result = user_results.get("result", {})
+        if result:
+            legacy = result.get("legacy", {})
+            if legacy and legacy.get("screen_name"):
+                logger.debug("tweet %s: resolved via user_results.result.legacy", tweet_id)
+                return User(
+                    id=result.get("rest_id", ""),
+                    username=legacy["screen_name"],
+                    display_name=legacy.get("name", "Unknown"),
+                )
+            # Path 3: flattened — screen_name directly on result (no legacy wrapper)
+            if result.get("screen_name"):
+                logger.debug("tweet %s: resolved via user_results.result (flattened)", tweet_id)
+                return User(
+                    id=result.get("rest_id", ""),
+                    username=result["screen_name"],
+                    display_name=result.get("name", "Unknown"),
+                )
+
+    # Path 2: singular variant — core.user_result.result.legacy
+    user_result_singular = core.get("user_result", {})
+    if user_result_singular:
+        logger.debug("tweet %s: trying singular user_result", tweet_id)
+        result = user_result_singular.get("result", {})
+        if result:
+            legacy = result.get("legacy", {})
+            if legacy and legacy.get("screen_name"):
+                logger.debug("tweet %s: resolved via user_result.result.legacy", tweet_id)
+                return User(
+                    id=result.get("rest_id", ""),
+                    username=legacy["screen_name"],
+                    display_name=legacy.get("name", "Unknown"),
+                )
+            if result.get("screen_name"):
+                logger.debug("tweet %s: resolved via user_result.result (flattened)", tweet_id)
+                return User(
+                    id=result.get("rest_id", ""),
+                    username=result["screen_name"],
+                    display_name=result.get("name", "Unknown"),
+                )
+
+    # Path 4: deep search — walk the tree looking for a user-like dict
+    found = _deep_find_user(core)
+    if found:
+        logger.debug("tweet %s: resolved via deep search", tweet_id)
+        return User(
+            id=found.get("rest_id", ""),
+            username=found["screen_name"],
+            display_name=found.get("name", "Unknown"),
+        )
+
+    logger.warning(
+        "tweet %s: could not resolve username — all paths returned empty. "
+        "core keys: %s. Use --dump-raw to inspect the API response.",
+        tweet_id,
+        list(core.keys()),
+    )
+    return User(id="", username="unknown", display_name="Unknown")
+
+
+def _deep_find_user(obj: object, max_depth: int = 6) -> dict | None:
+    """Recursively search for a dict containing both 'screen_name' and 'name'.
+
+    Walks nested dicts/lists up to max_depth levels. Returns the first match.
+    """
+    if max_depth <= 0 or not isinstance(obj, (dict, list)):
+        return None
+    if isinstance(obj, dict):
+        if "screen_name" in obj and "name" in obj:
+            return obj
+        for value in obj.values():
+            found = _deep_find_user(value, max_depth - 1)
+            if found:
+                return found
+    elif isinstance(obj, list):
+        for item in obj:
+            found = _deep_find_user(item, max_depth - 1)
+            if found:
+                return found
+    return None
+
+
 def _parse_single_entry(entry: dict) -> Bookmark | None:
     """Parse a single timeline entry into a Bookmark."""
     tweet_result = (
@@ -52,16 +153,9 @@ def _parse_single_entry(entry: dict) -> Bookmark | None:
 
     tweet_id = tweet_result.get("rest_id", "")
     legacy = tweet_result.get("legacy", {})
-    core = tweet_result.get("core", {})
 
-    # Parse user
-    user_result = core.get("user_results", {}).get("result", {})
-    user_legacy = user_result.get("legacy", {})
-    author = User(
-        id=user_result.get("rest_id", ""),
-        username=user_legacy.get("screen_name", "unknown"),
-        display_name=user_legacy.get("name", "Unknown"),
-    )
+    # Parse user via resilient multi-path extraction
+    author = _extract_user(tweet_result, tweet_id)
 
     # Parse text — replace t.co URLs with expanded versions
     full_text = legacy.get("full_text", "")
@@ -104,17 +198,11 @@ def _parse_single_entry(entry: dict) -> Bookmark | None:
         quoted_result = (
             tweet_result.get("quoted_status_result", {}).get("result", {})
         )
-        quoted_user = (
-            quoted_result.get("core", {})
-            .get("user_results", {})
-            .get("result", {})
-            .get("legacy", {})
-        )
         quoted_id = quoted_result.get("rest_id")
-        quoted_screen_name = quoted_user.get("screen_name")
-        if quoted_screen_name and quoted_id:
+        quoted_user = _extract_user(quoted_result, f"quoted-{quoted_id}")
+        if quoted_user.username != "unknown" and quoted_id:
             quoted_tweet_url = (
-                f"https://x.com/{quoted_screen_name}/status/{quoted_id}"
+                f"https://x.com/{quoted_user.username}/status/{quoted_id}"
             )
 
     tweet_url = f"https://x.com/{author.username}/status/{tweet_id}"
