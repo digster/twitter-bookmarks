@@ -104,6 +104,32 @@ Bookmarks are saved to a single `bookmarks.md` file, grouped by date (newest fir
 ---
 ```
 
+## Viewer
+
+A standalone HTML viewer for browsing exported bookmarks visually. No server or build step needed.
+
+### Usage
+
+1. Open `viewer.html` in any browser
+2. Drag-and-drop your exported `.md` file onto the drop zone (or use the file picker)
+3. Browse your bookmarks with search, sort, and media previews
+
+### Features
+
+- **List/grid view toggle** — compact list mode (default) for high-density scanning; grid mode for rich card layout with full media
+- List mode: click any row to expand and reveal full text, media, and links
+- Full-text search across usernames, display names, and tweet text
+- Sort by newest or oldest first
+- Dark/light theme toggle (persists across sessions)
+- View mode persists across sessions
+- Photo grids (1-4 images), video/GIF thumbnails with play overlay
+- Reply and quote tweet badges
+- External link display with domain names
+- Infinite scroll (loads 50 at a time)
+- Responsive layout (3-col → 2-col → 1-col in grid mode)
+- Keyboard shortcuts: `/` to focus search, `Escape` to clear
+- Stats bar with total count, date range, and filtered count
+
 ## Development
 
 ```bash

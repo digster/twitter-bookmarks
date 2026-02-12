@@ -1,0 +1,1751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bookmarks Viewer</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%234A99E9'><path d='M5 2h14a1 1 0 011 1v19.143a.5.5 0 01-.766.424L12 18.03l-7.234 4.536A.5.5 0 014 22.143V3a1 1 0 011-1z'/></svg>">
+<style>
+:root {
+  --bg: #f5f6f8;
+  --bg-card: #ffffff;
+  --bg-header: rgba(255,255,255,0.92);
+  --text-primary: #0f1419;
+  --text-secondary: #536471;
+  --text-tertiary: #8899a6;
+  --border: #e1e4e8;
+  --border-light: #eef0f2;
+  --accent: #1d9bf0;
+  --accent-hover: #1a8cd8;
+  --badge-reply: #e8f5fd;
+  --badge-reply-text: #1d9bf0;
+  --badge-quote: #f3e8fd;
+  --badge-quote-text: #7c3aed;
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.06);
+  --shadow-card-hover: 0 4px 12px rgba(0,0,0,0.1);
+  --shadow-header: 0 1px 3px rgba(0,0,0,0.06);
+  --landing-bg: #f0f2f5;
+  --drop-border: #bcc3cd;
+  --drop-bg: #e8ecf1;
+  --scrollbar-thumb: #c4c9d0;
+  --search-bg: #eff3f4;
+  --search-focus-bg: #ffffff;
+  --overlay-bg: rgba(0,0,0,0.5);
+  --img-placeholder: #e1e4e8;
+  --stats-bg: #f0f2f5;
+}
+[data-theme="dark"] {
+  --bg: #15202b;
+  --bg-card: #1e2d3d;
+  --bg-header: rgba(21,32,43,0.92);
+  --text-primary: #e7e9ea;
+  --text-secondary: #8899a6;
+  --text-tertiary: #6e7f8d;
+  --border: #2f3e4e;
+  --border-light: #253341;
+  --accent: #1d9bf0;
+  --accent-hover: #1a8cd8;
+  --badge-reply: #162d3f;
+  --badge-reply-text: #1d9bf0;
+  --badge-quote: #1f1635;
+  --badge-quote-text: #a78bfa;
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.2);
+  --shadow-card-hover: 0 4px 12px rgba(0,0,0,0.3);
+  --shadow-header: 0 1px 3px rgba(0,0,0,0.3);
+  --landing-bg: #10171e;
+  --drop-border: #3a4a5a;
+  --drop-bg: #1a2735;
+  --scrollbar-thumb: #3a4a5a;
+  --search-bg: #253341;
+  --search-focus-bg: #1e2d3d;
+  --overlay-bg: rgba(0,0,0,0.7);
+  --img-placeholder: #253341;
+  --stats-bg: #1a2735;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  scroll-behavior: smooth;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text-primary);
+  line-height: 1.5;
+  min-height: 100vh;
+  transition: background 0.2s, color 0.2s;
+}
+
+/* Landing screen */
+.landing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: var(--landing-bg);
+  padding: 24px;
+  transition: background 0.2s;
+}
+
+.landing-content {
+  text-align: center;
+  max-width: 520px;
+}
+
+.landing-icon {
+  margin-bottom: 24px;
+}
+
+.landing h1 {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+
+.landing p {
+  color: var(--text-secondary);
+  margin-bottom: 32px;
+  font-size: 15px;
+}
+
+.drop-zone {
+  border: 2px dashed var(--drop-border);
+  border-radius: 16px;
+  padding: 48px 32px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: var(--bg-card);
+}
+
+.drop-zone:hover, .drop-zone.drag-over {
+  border-color: var(--accent);
+  background: var(--drop-bg);
+}
+
+.drop-zone.drag-over {
+  transform: scale(1.01);
+}
+
+.drop-zone-icon {
+  margin-bottom: 16px;
+  color: var(--text-tertiary);
+}
+
+.drop-zone h3 {
+  font-size: 17px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.drop-zone p {
+  color: var(--text-tertiary);
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+.file-input-label {
+  display: inline-block;
+  padding: 8px 20px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 9999px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.file-input-label:hover { background: var(--accent-hover); }
+
+.file-input { display: none; }
+
+.landing-theme-btn {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all 0.15s;
+}
+.landing-theme-btn:hover { color: var(--text-primary); border-color: var(--accent); }
+
+.landing-error {
+  color: #e0245e;
+  margin-top: 16px;
+  font-size: 14px;
+  display: none;
+}
+
+/* App shell */
+.app { display: none; }
+.app.visible { display: block; }
+
+/* Header */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--bg-header);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow-header);
+  padding: 12px 24px;
+  transition: background 0.2s;
+}
+
+.header-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.header-title {
+  font-size: 18px;
+  font-weight: 700;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-title svg { flex-shrink: 0; }
+
+.search-box {
+  flex: 1;
+  min-width: 200px;
+  max-width: 480px;
+  position: relative;
+}
+
+.search-box svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-tertiary);
+  pointer-events: none;
+}
+
+.search-input {
+  width: 100%;
+  padding: 8px 12px 8px 38px;
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  background: var(--search-bg);
+  color: var(--text-primary);
+  font-size: 14px;
+  outline: none;
+  transition: all 0.15s;
+}
+.search-input:focus {
+  border-color: var(--accent);
+  background: var(--search-focus-bg);
+  box-shadow: 0 0 0 3px rgba(29,155,240,0.15);
+}
+.search-input::placeholder { color: var(--text-tertiary); }
+
+.search-shortcut {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  color: var(--text-tertiary);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+
+.search-input:focus ~ .search-shortcut { opacity: 0; }
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.sort-select {
+  padding: 6px 28px 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23536471' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  transition: border-color 0.15s;
+}
+.sort-select:focus { border-color: var(--accent); }
+
+.theme-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all 0.15s;
+}
+.theme-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+/* View toggle button */
+.view-toggle-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all 0.15s;
+}
+.view-toggle-btn:hover { color: var(--accent); border-color: var(--accent); }
+.view-toggle-btn .icon-grid,
+.view-toggle-btn .icon-list { display: none; }
+[data-view="list"] .view-toggle-btn .icon-grid { display: block; }
+[data-view="grid"] .view-toggle-btn .icon-list { display: block; }
+
+/* ── List Mode ── */
+[data-view="list"] .main {
+  max-width: 650px;
+}
+[data-view="list"] .stats-bar {
+  max-width: 650px;
+}
+[data-view="list"] .card-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+[data-view="list"] .card {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  border-radius: 0;
+  box-shadow: none;
+  border: none;
+  border-bottom: 1px solid var(--border-light);
+  padding: 12px 0;
+  overflow: visible;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+[data-view="list"] .card:hover {
+  box-shadow: none;
+  transform: none;
+  background: var(--search-bg);
+}
+
+[data-view="list"] .list-avatar {
+  flex-shrink: 0;
+  padding-top: 2px;
+  margin-right: 10px;
+}
+[data-view="list"] .list-avatar .avatar {
+  width: 32px;
+  height: 32px;
+  font-size: 13px;
+}
+
+[data-view="list"] .list-content {
+  flex: 1;
+  min-width: 0;
+}
+
+[data-view="list"] .list-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  line-height: 1.4;
+}
+
+[data-view="list"] .list-header .card-username {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+[data-view="list"] .list-header .card-displayname {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+[data-view="list"] .list-header .card-date {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+[data-view="list"] .list-separator {
+  color: var(--text-tertiary);
+  font-size: 12px;
+  user-select: none;
+}
+
+[data-view="list"] .list-body {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  margin-top: 2px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+[data-view="list"] .list-body a {
+  color: var(--accent);
+  text-decoration: none;
+}
+[data-view="list"] .list-body a:hover { text-decoration: underline; }
+
+[data-view="list"] .list-badges {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: 8px;
+}
+
+[data-view="list"] .list-badges .badge {
+  padding: 1px 8px;
+  font-size: 11px;
+}
+
+[data-view="list"] .list-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+[data-view="list"] .media-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+[data-view="list"] .media-indicator svg { flex-shrink: 0; }
+
+[data-view="list"] .list-actions {
+  flex-shrink: 0;
+  margin-left: 12px;
+  padding-top: 2px;
+}
+
+[data-view="list"] .list-view-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  color: var(--text-tertiary);
+  text-decoration: none;
+  transition: all 0.15s;
+}
+[data-view="list"] .list-view-link:hover {
+  color: var(--accent);
+  background: var(--badge-reply);
+}
+
+/* List expanded state */
+[data-view="list"] .card.expanded {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin: 4px 0;
+  padding: 12px 16px;
+}
+
+[data-view="list"] .card.expanded .list-body {
+  -webkit-line-clamp: unset;
+  display: block;
+}
+
+[data-view="list"] .card.expanded .list-expanded-content {
+  display: block;
+}
+
+[data-view="list"] .list-expanded-content {
+  display: none;
+  margin-top: 8px;
+}
+
+[data-view="list"] .list-expanded-content .media-grid { padding: 0; margin-top: 8px; max-width: 500px; }
+[data-view="list"] .list-expanded-content .card-links { padding: 4px 0 0; }
+[data-view="list"] .list-expanded-content .card-link { font-size: 12px; }
+
+/* List thumbnail preview */
+[data-view="list"] .list-thumbnail {
+  position: relative;
+  margin-top: 8px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--img-placeholder);
+  max-width: 350px;
+  aspect-ratio: 16/9;
+}
+[data-view="list"] .list-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+[data-view="list"] .list-thumbnail-count {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  background: rgba(0,0,0,0.65);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+[data-view="list"] .list-thumbnail-play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.3);
+}
+/* Hide thumbnail when expanded (full grid is shown) */
+[data-view="list"] .card.expanded .list-thumbnail {
+  display: none;
+}
+
+/* Stats bar */
+.stats-bar {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 10px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  flex-wrap: wrap;
+}
+
+.stats-bar .stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.stats-bar .stat strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.stats-bar .stat-divider {
+  width: 1px;
+  height: 14px;
+  background: var(--border);
+}
+
+/* Main grid */
+.main {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 8px 24px 80px;
+}
+
+.date-group-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding: 16px 0 8px;
+  border-bottom: 1px solid var(--border-light);
+  margin-bottom: 16px;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+/* Cards */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  transition: box-shadow 0.2s, transform 0.15s;
+}
+.card:hover {
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-1px);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px 0;
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 16px;
+  color: #fff;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+
+.card-author {
+  flex: 1;
+  min-width: 0;
+}
+
+.card-username {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text-primary);
+  text-decoration: none;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.card-username:hover { text-decoration: underline; }
+
+.card-displayname {
+  font-size: 13px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-date {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.card-body {
+  padding: 10px 16px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-primary);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.card-body p { margin-bottom: 8px; }
+.card-body p:last-child { margin-bottom: 0; }
+
+.card-body a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.card-body a:hover { text-decoration: underline; }
+
+.show-more-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+  font-weight: 500;
+}
+.show-more-btn:hover { text-decoration: underline; }
+
+/* Media grid */
+.media-grid {
+  padding: 0 16px 8px;
+  display: grid;
+  gap: 4px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.media-grid.grid-1 { grid-template-columns: 1fr; }
+.media-grid.grid-2 { grid-template-columns: 1fr 1fr; }
+.media-grid.grid-3 { grid-template-columns: 1fr 1fr; grid-template-rows: auto auto; }
+.media-grid.grid-3 .media-item:first-child { grid-row: 1 / 3; }
+.media-grid.grid-4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+
+.media-item {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--img-placeholder);
+  aspect-ratio: 16/10;
+}
+
+.media-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.media-item .play-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.3);
+}
+
+.media-item .play-icon {
+  width: 44px;
+  height: 44px;
+  background: rgba(29,155,240,0.9);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.media-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+/* Badges */
+.card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 16px 8px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.badge-reply {
+  background: var(--badge-reply);
+  color: var(--badge-reply-text);
+}
+
+.badge-quote {
+  background: var(--badge-quote);
+  color: var(--badge-quote-text);
+}
+.badge-quote:hover { text-decoration: underline; }
+
+/* Links section */
+.card-links {
+  padding: 4px 16px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.card-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--accent);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.card-link:hover { text-decoration: underline; }
+.card-link svg { flex-shrink: 0; color: var(--text-tertiary); }
+
+/* Card footer */
+.card-footer {
+  padding: 8px 16px 12px;
+  border-top: 1px solid var(--border-light);
+  margin-top: 4px;
+}
+
+.card-footer a {
+  font-size: 13px;
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.card-footer a:hover { text-decoration: underline; }
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: 80px 24px;
+  color: var(--text-secondary);
+}
+.empty-state h3 {
+  font-size: 18px;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+.empty-state p { font-size: 14px; }
+
+/* Loading */
+.loading-spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px;
+  gap: 12px;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Scroll to top */
+.scroll-top {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(29,155,240,0.4);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(8px);
+  transition: all 0.2s;
+  z-index: 50;
+}
+.scroll-top.visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+.scroll-top:hover { background: var(--accent-hover); }
+
+/* Sentinel for infinite scroll */
+.sentinel { height: 1px; }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .header { padding: 10px 16px; }
+  .header-inner { gap: 10px; }
+  .header-title { font-size: 16px; }
+  .search-box { min-width: 160px; order: 10; flex-basis: 100%; max-width: none; }
+  .stats-bar { padding: 8px 16px; }
+  .main { padding: 8px 16px 80px; }
+  .card-grid { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+}
+
+@media (max-width: 480px) {
+  .header { padding: 8px 12px; }
+  .main { padding: 4px 12px 80px; }
+  .card-grid { grid-template-columns: 1fr; gap: 10px; }
+  .card-header { padding: 12px 14px 0; }
+  .card-body { padding: 8px 14px; }
+  .card-links { padding: 4px 14px 8px; }
+  .card-badges { padding: 4px 14px 8px; }
+  .card-footer { padding: 8px 14px 10px; }
+  .media-grid { padding: 0 14px 6px; }
+  .landing h1 { font-size: 22px; }
+  .drop-zone { padding: 32px 20px; }
+}
+
+@media (max-width: 480px) {
+  [data-view="list"] .card { padding: 10px 0; }
+  [data-view="list"] .list-actions { margin-left: 8px; }
+  [data-view="list"] .list-header { gap: 4px; }
+  [data-view="list"] .list-thumbnail { max-width: 100%; }
+}
+</style>
+</head>
+<body>
+
+<!-- Landing screen -->
+<div class="landing" id="landing">
+  <button class="landing-theme-btn" id="landingThemeBtn" aria-label="Toggle theme">
+    <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+    <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+  </button>
+
+  <div class="landing-content">
+    <div class="landing-icon">
+      <svg width="56" height="56" viewBox="0 0 24 24" fill="var(--accent)"><path d="M5 2h14a1 1 0 011 1v19.143a.5.5 0 01-.766.424L12 18.03l-7.234 4.536A.5.5 0 014 22.143V3a1 1 0 011-1z"/></svg>
+    </div>
+    <h1>Bookmarks Viewer</h1>
+    <p>Browse your exported Twitter/X bookmarks with search, sort, and media previews.</p>
+    <div class="drop-zone" id="dropZone">
+      <div class="drop-zone-icon">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      </div>
+      <h3>Drop your bookmarks file here</h3>
+      <p>or click to browse — accepts .md files</p>
+      <label class="file-input-label" for="fileInput">Choose File</label>
+      <input type="file" id="fileInput" class="file-input" accept=".md">
+    </div>
+    <div class="landing-error" id="landingError"></div>
+  </div>
+</div>
+
+<!-- App shell -->
+<div class="app" id="app">
+  <header class="header">
+    <div class="header-inner">
+      <div class="header-title">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="var(--accent)"><path d="M5 2h14a1 1 0 011 1v19.143a.5.5 0 01-.766.424L12 18.03l-7.234 4.536A.5.5 0 014 22.143V3a1 1 0 011-1z"/></svg>
+        Bookmarks
+      </div>
+      <div class="search-box">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" class="search-input" id="searchInput" placeholder="Search bookmarks..." autocomplete="off">
+        <span class="search-shortcut">/</span>
+      </div>
+      <div class="header-controls">
+        <select class="sort-select" id="sortSelect">
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+        </select>
+        <button class="view-toggle-btn" id="viewToggleBtn" aria-label="Toggle view mode">
+          <svg class="icon-list" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          <svg class="icon-grid" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        </button>
+        <button class="theme-btn" id="themeBtn" aria-label="Toggle theme">
+          <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="stats-bar" id="statsBar"></div>
+
+  <main class="main" id="mainContent"></main>
+
+  <div class="sentinel" id="sentinel"></div>
+</div>
+
+<button class="scroll-top" id="scrollTopBtn" aria-label="Scroll to top">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+</button>
+
+<script>
+(function() {
+  'use strict';
+
+  // ── State ──
+  let allBookmarks = [];
+  let filteredBookmarks = [];
+  let renderedCount = 0;
+  const BATCH_SIZE = 50;
+  let exportDate = '';
+  let totalFromHeader = 0;
+  let observer = null;
+  let searchTimeout = null;
+  let viewMode = 'list';
+
+  // ── DOM refs ──
+  const $ = id => document.getElementById(id);
+  const landing = $('landing');
+  const app = $('app');
+  const dropZone = $('dropZone');
+  const fileInput = $('fileInput');
+  const landingError = $('landingError');
+  const searchInput = $('searchInput');
+  const sortSelect = $('sortSelect');
+  const statsBar = $('statsBar');
+  const mainContent = $('mainContent');
+  const sentinel = $('sentinel');
+  const scrollTopBtn = $('scrollTopBtn');
+
+  // ── Avatar colors ──
+  const avatarColors = [
+    '#1d9bf0','#7856ff','#f91880','#ff7a00','#00ba7c',
+    '#ffd400','#794bc4','#17bf63','#e0245e','#1da1f2'
+  ];
+
+  function getAvatarColor(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0;
+    return avatarColors[Math.abs(hash) % avatarColors.length];
+  }
+
+  // ── Theme ──
+  function initTheme() {
+    const saved = localStorage.getItem('bookmarks-viewer-theme');
+    if (saved) {
+      setTheme(saved);
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      setTheme('dark');
+    }
+  }
+
+  function setTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('bookmarks-viewer-theme', theme);
+    updateThemeIcons();
+  }
+
+  function toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme');
+    setTheme(current === 'dark' ? 'light' : 'dark');
+  }
+
+  function updateThemeIcons() {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    document.querySelectorAll('.icon-sun').forEach(el => el.style.display = isDark ? 'none' : 'block');
+    document.querySelectorAll('.icon-moon').forEach(el => el.style.display = isDark ? 'block' : 'none');
+  }
+
+  // ── View Mode ──
+  function initViewMode() {
+    const saved = localStorage.getItem('bookmarks-viewer-view');
+    viewMode = (saved === 'grid' || saved === 'list') ? saved : 'list';
+    document.documentElement.setAttribute('data-view', viewMode);
+  }
+
+  function setViewMode(mode) {
+    viewMode = mode;
+    document.documentElement.setAttribute('data-view', mode);
+    localStorage.setItem('bookmarks-viewer-view', mode);
+  }
+
+  function toggleViewMode() {
+    setViewMode(viewMode === 'list' ? 'grid' : 'list');
+    if (allBookmarks.length) renderAll();
+  }
+
+  // ── HTML entity decode ──
+  const decodeArea = document.createElement('textarea');
+  function decodeEntities(str) {
+    decodeArea.innerHTML = str;
+    return decodeArea.value;
+  }
+
+  // ── Markdown Parser ──
+  function parseMarkdown(text) {
+    const lines = text.split('\n');
+    const bookmarks = [];
+    let current = null;
+    let currentDate = '';
+    let inBlockquote = false;
+    let textLines = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      // Header metadata
+      if (line.startsWith('*Last updated:') || line.startsWith('*last updated:')) {
+        const m = line.match(/(\d{4}-\d{2}-\d{2})\s+\d{2}:\d{2}\s*\|\s*(\d+)\s*bookmarks/i);
+        if (m) {
+          exportDate = m[1];
+          totalFromHeader = parseInt(m[2], 10);
+        }
+        continue;
+      }
+
+      // Date group
+      if (line.startsWith('## ') && !line.startsWith('### ')) {
+        currentDate = line.slice(3).trim();
+        continue;
+      }
+
+      // Username
+      if (line.startsWith('### @')) {
+        // Finalize previous if somehow not terminated by ---
+        if (current) {
+          finalizeBookmark(current, textLines, bookmarks);
+          textLines = [];
+        }
+        current = {
+          username: line.slice(5).trim(),
+          displayName: '',
+          tweetText: '',
+          dateGroup: currentDate,
+          tweetUrl: '',
+          date: null,
+          dateStr: '',
+          links: [],
+          media: [],
+          replyTo: null,
+          quoteUrl: null,
+          _searchText: ''
+        };
+        inBlockquote = false;
+        continue;
+      }
+
+      if (!current) continue;
+
+      // Display name — *Name*
+      if (!current.displayName && line.startsWith('*') && line.endsWith('*') && !line.startsWith('*Last') && line.length > 2) {
+        current.displayName = line.slice(1, -1).trim();
+        continue;
+      }
+
+      // Blockquote text
+      if (line.startsWith('> ') || line === '>') {
+        inBlockquote = true;
+        const content = line === '>' ? '' : line.slice(2);
+        textLines.push(content);
+        continue;
+      }
+
+      if (inBlockquote && line === '') {
+        inBlockquote = false;
+        continue;
+      }
+
+      // Metadata fields
+      if (line.startsWith('- **Tweet:**')) {
+        const m = line.match(/\[.*?\]\((https?:\/\/[^)]+)\)/);
+        if (m) current.tweetUrl = m[1];
+        continue;
+      }
+
+      if (line.startsWith('- **Date:**')) {
+        const dateStr = line.slice(11).trim();
+        current.dateStr = dateStr;
+        current.date = new Date(dateStr.replace(' UTC', 'Z').replace(' ', 'T') + (dateStr.includes('Z') ? '' : ''));
+        if (isNaN(current.date.getTime())) {
+          // Fallback: try direct parsing
+          current.date = new Date(dateStr.replace(' UTC', ' GMT'));
+        }
+        continue;
+      }
+
+      if (line.startsWith('- **Links:**')) {
+        const linkRegex = /\[([^\]]*)\]\((https?:\/\/[^)]+)\)/g;
+        let lm;
+        while ((lm = linkRegex.exec(line)) !== null) {
+          current.links.push({ text: lm[1], url: lm[2] });
+        }
+        continue;
+      }
+
+      if (line.startsWith('- **Media:**')) {
+        const mediaRegex = /\[(photo|video|animated_gif)\]\((https?:\/\/[^)]+)\)/g;
+        let mm;
+        while ((mm = mediaRegex.exec(line)) !== null) {
+          current.media.push({ type: mm[1], url: mm[2] });
+        }
+        continue;
+      }
+
+      if (line.startsWith('- **Reply to:**')) {
+        current.replyTo = line.slice(15).trim().replace(/^@/, '');
+        continue;
+      }
+
+      if (line.startsWith('- **Quote of:**')) {
+        const m = line.match(/\[.*?\]\((https?:\/\/[^)]+)\)/);
+        if (m) current.quoteUrl = m[1];
+        continue;
+      }
+
+      // Separator — finalize bookmark
+      if (line === '---') {
+        if (current) {
+          finalizeBookmark(current, textLines, bookmarks);
+          current = null;
+          textLines = [];
+          inBlockquote = false;
+        }
+        continue;
+      }
+    }
+
+    // Handle last bookmark without trailing ---
+    if (current) {
+      finalizeBookmark(current, textLines, bookmarks);
+    }
+
+    return bookmarks;
+  }
+
+  function finalizeBookmark(bm, textLines, list) {
+    // Process text: join lines, handle paragraph breaks
+    let text = '';
+    let paragraphs = [];
+    let buf = [];
+    for (const line of textLines) {
+      if (line === '') {
+        if (buf.length) paragraphs.push(buf.join('\n'));
+        buf = [];
+      } else {
+        buf.push(line);
+      }
+    }
+    if (buf.length) paragraphs.push(buf.join('\n'));
+    bm.tweetText = decodeEntities(paragraphs.join('\n\n'));
+
+    // If no display name, use username
+    if (!bm.displayName) bm.displayName = bm.username;
+
+    // Pre-compute search text
+    bm._searchText = (bm.username + ' ' + bm.displayName + ' ' + bm.tweetText).toLowerCase();
+
+    list.push(bm);
+  }
+
+  // ── Linkify URLs in text ──
+  function linkifyText(text) {
+    // Escape HTML first
+    let escaped = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    // Linkify URLs
+    escaped = escaped.replace(
+      /(https?:\/\/[^\s<>"')\]]+)/g,
+      '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
+    );
+
+    return escaped;
+  }
+
+  // ── Relative date ──
+  function relativeDate(date) {
+    if (!date || isNaN(date.getTime())) return '';
+    const now = new Date();
+    const diff = now - date;
+    const mins = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return mins + 'm';
+    if (hours < 24) return hours + 'h';
+    if (days < 7) return days + 'd';
+    if (days < 365) return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  // ── Domain from URL ──
+  function getDomain(url) {
+    try {
+      return new URL(url).hostname.replace(/^www\./, '');
+    } catch { return url; }
+  }
+
+  // ── Build media grid HTML (shared) ──
+  function buildMediaHtml(bm) {
+    let mediaHtml = '';
+    if (!bm.media.length) return mediaHtml;
+
+    const photos = bm.media.filter(m => m.type === 'photo');
+    const videos = bm.media.filter(m => m.type === 'video' || m.type === 'animated_gif');
+
+    if (photos.length) {
+      const count = Math.min(photos.length, 4);
+      mediaHtml += '<div class="media-grid grid-' + count + '">';
+      for (let i = 0; i < count; i++) {
+        mediaHtml += '<div class="media-item"><img loading="lazy" src="' + escapeAttr(photos[i].url) + '" alt="Photo" onerror="this.parentElement.innerHTML=\'<div class=media-placeholder>Image unavailable</div>\'"></div>';
+      }
+      mediaHtml += '</div>';
+    }
+
+    for (const v of videos) {
+      mediaHtml += '<div class="media-grid grid-1"><div class="media-item">' +
+        '<img loading="lazy" src="' + escapeAttr(v.url) + '" alt="' + (v.type === 'animated_gif' ? 'GIF' : 'Video') + ' thumbnail" onerror="this.parentElement.innerHTML=\'<div class=media-placeholder>' + (v.type === 'animated_gif' ? 'GIF' : 'Video') + ' unavailable</div>\'">' +
+        '<div class="play-overlay"><div class="play-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><polygon points="5 3 19 12 5 21 5 3"/></svg></div></div>' +
+        '</div></div>';
+    }
+    return mediaHtml;
+  }
+
+  // ── Build badges HTML (shared) ──
+  function buildBadgesHtml(bm) {
+    let html = '';
+    if (bm.replyTo) {
+      html += '<span class="badge badge-reply">Reply to @' + escapeHtml(bm.replyTo) + '</span>';
+    }
+    if (bm.quoteUrl) {
+      html += '<a class="badge badge-quote" href="' + escapeAttr(bm.quoteUrl) + '" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">Quote</a>';
+    }
+    return html;
+  }
+
+  // ── Build links HTML (shared) ──
+  function buildLinksHtml(bm) {
+    if (!bm.links.length) return '';
+    let html = '<div class="card-links">';
+    for (const link of bm.links) {
+      html += '<a class="card-link" href="' + escapeAttr(link.url) + '" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">' +
+        '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>' +
+        escapeHtml(getDomain(link.url)) + '</a>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  // ── Render a card ──
+  function renderCard(bm) {
+    const color = getAvatarColor(bm.username);
+    const initial = bm.username[0] || '?';
+    const profileUrl = 'https://x.com/' + bm.username;
+
+    if (viewMode === 'list') {
+      return renderListCard(bm, color, initial, profileUrl);
+    }
+    return renderGridCard(bm, color, initial, profileUrl);
+  }
+
+  // ── List mode card ──
+  function renderListCard(bm, color, initial, profileUrl) {
+    // Text body (plain text, no HTML paragraphs — will be line-clamped by CSS)
+    const bodyText = bm.tweetText ? linkifyText(bm.tweetText).replace(/\n\n/g, ' ').replace(/\n/g, ' ') : '';
+
+    // Badges inline
+    const badgesHtml = buildBadgesHtml(bm);
+
+    // Media indicator
+    let mediaIndicator = '';
+    if (bm.media.length) {
+      const photos = bm.media.filter(m => m.type === 'photo');
+      const videos = bm.media.filter(m => m.type === 'video');
+      const gifs = bm.media.filter(m => m.type === 'animated_gif');
+      const parts = [];
+      if (photos.length) {
+        parts.push('<span class="media-indicator"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> ' + photos.length + '</span>');
+      }
+      if (videos.length) {
+        parts.push('<span class="media-indicator"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg> ' + videos.length + '</span>');
+      }
+      if (gifs.length) {
+        parts.push('<span class="media-indicator"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M10 8l6 4-6 4V8z"/></svg> GIF</span>');
+      }
+      mediaIndicator = parts.join('');
+    }
+
+    // Link count indicator
+    let linkIndicator = '';
+    if (bm.links.length) {
+      linkIndicator = '<span class="media-indicator"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg> ' + bm.links.length + '</span>';
+    }
+
+    // Expanded content (media + links, hidden by default)
+    let expandedHtml = '';
+    if (bm.media.length || bm.links.length) {
+      expandedHtml = '<div class="list-expanded-content">';
+      expandedHtml += buildMediaHtml(bm);
+      expandedHtml += buildLinksHtml(bm);
+      expandedHtml += '</div>';
+    }
+
+    const metaHtml = (mediaIndicator || linkIndicator) ?
+      '<div class="list-meta">' + mediaIndicator + linkIndicator + '</div>' : '';
+
+    // Thumbnail preview for collapsed state
+    let thumbnailHtml = '';
+    const firstPhoto = bm.media.find(m => m.type === 'photo');
+    if (firstPhoto) {
+      thumbnailHtml = '<div class="list-thumbnail">' +
+        '<img loading="lazy" src="' + escapeAttr(firstPhoto.url) + '" alt="Preview"' +
+        ' onerror="this.parentElement.style.display=\'none\'">' +
+        (bm.media.length > 1 ? '<span class="list-thumbnail-count">+' + (bm.media.length - 1) + '</span>' : '') +
+        '</div>';
+    } else {
+      const firstVideo = bm.media.find(m => m.type === 'video' || m.type === 'animated_gif');
+      if (firstVideo) {
+        thumbnailHtml = '<div class="list-thumbnail list-thumbnail-video">' +
+          '<img loading="lazy" src="' + escapeAttr(firstVideo.url) + '" alt="Video preview"' +
+          ' onerror="this.parentElement.style.display=\'none\'">' +
+          '<div class="list-thumbnail-play"><svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>' +
+          '</div>';
+      }
+    }
+
+    return '<div class="card">' +
+      '<div class="list-avatar"><div class="avatar" style="background:' + color + '">' + escapeHtml(initial) + '</div></div>' +
+      '<div class="list-content">' +
+        '<div class="list-header">' +
+          '<a class="card-username" href="' + escapeAttr(profileUrl) + '" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">@' + escapeHtml(bm.username) + '</a>' +
+          (bm.displayName !== bm.username ?
+            '<span class="list-separator">&middot;</span><span class="card-displayname">' + escapeHtml(bm.displayName) + '</span>' : '') +
+          '<span class="list-separator">&middot;</span><span class="card-date">' + relativeDate(bm.date) + '</span>' +
+          (badgesHtml ? '<span class="list-badges">' + badgesHtml + '</span>' : '') +
+        '</div>' +
+        (bodyText ? '<div class="list-body">' + bodyText + '</div>' : '') +
+        metaHtml +
+        thumbnailHtml +
+        expandedHtml +
+      '</div>' +
+      '<div class="list-actions">' +
+        '<a class="list-view-link" href="' + escapeAttr(bm.tweetUrl || profileUrl) + '" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title="View on X">' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>' +
+        '</a>' +
+      '</div>' +
+    '</div>';
+  }
+
+  // ── Grid mode card (original) ──
+  function renderGridCard(bm, color, initial, profileUrl) {
+    // Tweet text
+    let bodyHtml = '';
+    if (bm.tweetText) {
+      const truncate = bm.tweetText.length > 280;
+      const displayText = truncate ? bm.tweetText.slice(0, 280) : bm.tweetText;
+      const paragraphs = displayText.split('\n\n').map(p =>
+        '<p>' + linkifyText(p).replace(/\n/g, '<br>') + '</p>'
+      ).join('');
+
+      bodyHtml = '<div class="card-body">' + paragraphs;
+      if (truncate) {
+        bodyHtml += '<button class="show-more-btn" onclick="this.parentElement.innerHTML=this.getAttribute(\'data-full\')" data-full="' +
+          escapeAttr(bm.tweetText.split('\n\n').map(p => '<p>' + linkifyText(p).replace(/\n/g, '<br>') + '</p>').join('')) +
+          '">Show more</button>';
+      }
+      bodyHtml += '</div>';
+    }
+
+    // Media
+    const mediaHtml = buildMediaHtml(bm);
+
+    // Badges
+    const badges = buildBadgesHtml(bm);
+    const badgesHtml = badges ? '<div class="card-badges">' + badges + '</div>' : '';
+
+    // Links
+    const linksHtml = buildLinksHtml(bm);
+
+    return '<div class="card">' +
+      '<div class="card-header">' +
+        '<div class="avatar" style="background:' + color + '">' + escapeHtml(initial) + '</div>' +
+        '<div class="card-author">' +
+          '<a class="card-username" href="' + escapeAttr(profileUrl) + '" target="_blank" rel="noopener noreferrer">@' + escapeHtml(bm.username) + '</a>' +
+          (bm.displayName !== bm.username ? '<div class="card-displayname">' + escapeHtml(bm.displayName) + '</div>' : '') +
+        '</div>' +
+        '<div class="card-date">' + relativeDate(bm.date) + '</div>' +
+      '</div>' +
+      bodyHtml +
+      mediaHtml +
+      badgesHtml +
+      linksHtml +
+      '<div class="card-footer">' +
+        '<a href="' + escapeAttr(bm.tweetUrl || profileUrl) + '" target="_blank" rel="noopener noreferrer">' +
+          'View on X <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>' +
+        '</a>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function escapeAttr(str) {
+    return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  // ── Render bookmarks in batches ──
+  function renderBatch() {
+    const fragment = document.createDocumentFragment();
+    const end = Math.min(renderedCount + BATCH_SIZE, filteredBookmarks.length);
+
+    // Group by date for rendering
+    let lastDate = '';
+    // Get the last rendered date to avoid duplicate headers
+    const existingHeaders = mainContent.querySelectorAll('.date-group-label');
+    if (existingHeaders.length) {
+      lastDate = existingHeaders[existingHeaders.length - 1].textContent;
+    }
+
+    let currentGrid = null;
+
+    for (let i = renderedCount; i < end; i++) {
+      const bm = filteredBookmarks[i];
+      if (bm.dateGroup && bm.dateGroup !== lastDate) {
+        lastDate = bm.dateGroup;
+        const label = document.createElement('div');
+        label.className = 'date-group-label';
+        label.textContent = bm.dateGroup;
+        fragment.appendChild(label);
+        currentGrid = document.createElement('div');
+        currentGrid.className = 'card-grid';
+        fragment.appendChild(currentGrid);
+      }
+
+      if (!currentGrid) {
+        // First batch continues existing grid, or create new
+        const grids = mainContent.querySelectorAll('.card-grid');
+        if (grids.length) {
+          currentGrid = grids[grids.length - 1];
+        } else {
+          currentGrid = document.createElement('div');
+          currentGrid.className = 'card-grid';
+          fragment.appendChild(currentGrid);
+        }
+      }
+
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = renderCard(bm);
+      const cardEl = wrapper.firstChild;
+
+      // If currentGrid is already in DOM (from previous batch), append directly
+      if (currentGrid.parentNode === mainContent) {
+        currentGrid.appendChild(cardEl);
+      } else {
+        currentGrid.appendChild(cardEl);
+      }
+    }
+
+    mainContent.appendChild(fragment);
+    renderedCount = end;
+    updateStats();
+  }
+
+  function renderAll() {
+    mainContent.innerHTML = '';
+    renderedCount = 0;
+
+    if (filteredBookmarks.length === 0) {
+      mainContent.innerHTML = '<div class="empty-state"><h3>No bookmarks found</h3><p>Try a different search term.</p></div>';
+      updateStats();
+      return;
+    }
+
+    renderBatch();
+  }
+
+  // ── Stats ──
+  function updateStats() {
+    const total = allBookmarks.length;
+    const filtered = filteredBookmarks.length;
+    const showing = renderedCount;
+
+    let dateRange = '';
+    if (allBookmarks.length) {
+      const dates = allBookmarks.filter(b => b.date && !isNaN(b.date.getTime())).map(b => b.date);
+      if (dates.length) {
+        const oldest = new Date(Math.min(...dates));
+        const newest = new Date(Math.max(...dates));
+        const fmt = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        dateRange = fmt(oldest) + ' — ' + fmt(newest);
+      }
+    }
+
+    const isFiltered = filteredBookmarks.length !== allBookmarks.length;
+    let html = '<span class="stat"><strong>' + total + '</strong> bookmarks</span>';
+    if (dateRange) {
+      html += '<span class="stat-divider"></span><span class="stat">' + dateRange + '</span>';
+    }
+    if (isFiltered) {
+      html += '<span class="stat-divider"></span><span class="stat"><strong>' + filtered + '</strong> matching</span>';
+    }
+    html += '<span class="stat-divider"></span><span class="stat">Showing <strong>' + showing + '</strong> of ' + filtered + '</span>';
+
+    statsBar.innerHTML = html;
+  }
+
+  // ── Search ──
+  function performSearch() {
+    const query = searchInput.value.trim().toLowerCase();
+    if (!query) {
+      filteredBookmarks = getSortedBookmarks();
+    } else {
+      const terms = query.split(/\s+/);
+      const sorted = getSortedBookmarks();
+      filteredBookmarks = sorted.filter(bm =>
+        terms.every(t => bm._searchText.includes(t))
+      );
+    }
+    renderAll();
+  }
+
+  // ── Sort ──
+  function getSortedBookmarks() {
+    const sorted = [...allBookmarks];
+    if (sortSelect.value === 'oldest') {
+      sorted.reverse();
+    }
+    return sorted;
+  }
+
+  // ── File loading ──
+  function handleFile(file) {
+    if (!file) return;
+    if (!file.name.endsWith('.md')) {
+      showError('Please select a .md (Markdown) file.');
+      return;
+    }
+    showError('');
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const text = e.target.result;
+      allBookmarks = parseMarkdown(text);
+
+      if (!allBookmarks.length) {
+        showError('No bookmarks found in this file. Make sure it\'s a valid bookmarks export.');
+        return;
+      }
+
+      filteredBookmarks = getSortedBookmarks();
+      landing.style.display = 'none';
+      app.classList.add('visible');
+      renderAll();
+      setupInfiniteScroll();
+    };
+    reader.readAsText(file);
+  }
+
+  function showError(msg) {
+    landingError.textContent = msg;
+    landingError.style.display = msg ? 'block' : 'none';
+  }
+
+  // ── Drag and drop ──
+  dropZone.addEventListener('dragenter', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); });
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    handleFile(file);
+  });
+
+  dropZone.addEventListener('click', e => {
+    if (e.target.closest('.file-input-label')) return; // Let label handle it
+    fileInput.click();
+  });
+
+  fileInput.addEventListener('change', () => {
+    handleFile(fileInput.files[0]);
+  });
+
+  // ── Infinite scroll ──
+  function setupInfiniteScroll() {
+    if (observer) observer.disconnect();
+    observer = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && renderedCount < filteredBookmarks.length) {
+        renderBatch();
+      }
+    }, { rootMargin: '400px' });
+    observer.observe(sentinel);
+  }
+
+  // ── Search debounce ──
+  searchInput.addEventListener('input', () => {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(performSearch, 250);
+  });
+
+  // ── Sort change ──
+  sortSelect.addEventListener('change', () => {
+    performSearch(); // Re-filters with new sort
+  });
+
+  // ── Theme buttons ──
+  $('landingThemeBtn').addEventListener('click', toggleTheme);
+  $('themeBtn').addEventListener('click', toggleTheme);
+
+  // ── View toggle ──
+  $('viewToggleBtn').addEventListener('click', toggleViewMode);
+
+  // ── List row expand/collapse ──
+  mainContent.addEventListener('click', function(e) {
+    if (viewMode !== 'list') return;
+    const card = e.target.closest('.card');
+    if (!card) return;
+    // Don't toggle if user clicked a link, button, or badge
+    if (e.target.closest('a, button')) return;
+    card.classList.toggle('expanded');
+  });
+
+  // ── Keyboard shortcuts ──
+  document.addEventListener('keydown', e => {
+    if (e.key === '/' && !e.ctrlKey && !e.metaKey && document.activeElement !== searchInput) {
+      e.preventDefault();
+      searchInput.focus();
+    }
+    if (e.key === 'Escape' && document.activeElement === searchInput) {
+      searchInput.value = '';
+      searchInput.blur();
+      performSearch();
+    }
+  });
+
+  // ── Scroll to top ──
+  window.addEventListener('scroll', () => {
+    scrollTopBtn.classList.toggle('visible', window.scrollY > 500);
+  }, { passive: true });
+
+  scrollTopBtn.addEventListener('click', () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  // ── Init ──
+  initTheme();
+  initViewMode();
+})();
+</script>
+</body>
+</html>

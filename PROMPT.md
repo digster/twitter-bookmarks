@@ -6,3 +6,6 @@
 ## 2026-02-11
 - Add configurable delay between API pagination requests (default 2s, via config and --delay flag) and a --count/-n flag to fetch only the N most recent bookmarks.
 - Fix "Unknown" author usernames: add resilient multi-path user extraction (`_extract_user()` with 4 fallback paths), `--dump-raw` diagnostic flag, and debug logging for key visibility.
+- Build a standalone HTML viewer (`viewer.html`) for browsing exported bookmarks visually. Single file, no server needed. Features: drag-and-drop file loading, card-based UI with date grouping, full-text search (AND logic), sort toggle, dark/light theme with persistence, photo grids, video thumbnails, reply/quote badges, infinite scroll, responsive layout, keyboard shortcuts.
+- Add list view mode to the bookmarks viewer. Compact single-column rows with inline metadata, 2-line text clamp, media indicators, click-to-expand. List mode is the default. Toggle between list/grid via header button. View mode persists in localStorage.
+- Fix list view UX: constrain tweet width to ~650px centered, bound expanded images to 500px max, add thumbnail previews in collapsed list cards (photo/video with count badge and play overlay). Thumbnail hides on expand. Responsive for mobile.

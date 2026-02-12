@@ -43,6 +43,28 @@ Twitter's internal API uses cookie-based auth with three components:
 - **Pagination:** Cursor-based. Each response includes `cursor-bottom` for the next page.
 - **Feature flags:** Boolean flags sent with each request. Hardcoded to match current web client.
 
+## Viewer (`viewer.html`)
+
+A standalone, self-contained HTML file for browsing exported bookmarks. Opens directly in any browser — no server or build step.
+
+**Architecture:**
+- Single file (~30 KB) with inline CSS, JS, and SVG icons
+- Client-side markdown parser: line-by-line state machine that reverses the `markdown.py` rendering
+- File loading via drag-and-drop or file picker (`FileReader.readAsText()`)
+- Rendering pipeline: parse → filter/sort → batch render (50 cards per batch via `IntersectionObserver`)
+- Theme system: CSS custom properties on `[data-theme]` attribute, persisted in `localStorage`
+- View mode system: `[data-view]` attribute on `<html>` (`list` or `grid`), persisted in `localStorage`
+- Search: pre-computed lowercase text per bookmark, AND logic for multi-word queries, 250ms debounce
+
+**Key patterns:**
+- Two render paths (`renderListCard` / `renderGridCard`) with shared helpers (`buildMediaHtml`, `buildBadgesHtml`, `buildLinksHtml`)
+- List mode: compact rows with 2-line text clamp, inline media indicators (SVG + count), click-to-expand revealing full media/links
+- Grid mode: original card layout with full media grids, show-more text, card footer
+- Cards rendered as HTML strings (not DOM nodes) for performance with `innerHTML`
+- Event delegation on main content for list row expand/collapse (single listener for all cards)
+- Lazy image loading with `loading="lazy"` and `onerror` fallback
+- No external dependencies — fully offline-capable
+
 ## Key Directories
 
 ```
@@ -50,4 +72,5 @@ src/twitter_bookmarks/    # Source code
 tests/                    # Tests with JSON fixtures in tests/fixtures/
 .state/                   # Runtime state (gitignored)
 ~/.config/twitter-bookmarks/  # Config with auth tokens (restricted permissions)
+viewer.html               # Standalone bookmarks viewer (client-side only)
 ```
