@@ -890,8 +890,64 @@ body {
 }
 .scroll-top:hover { background: var(--accent-hover); }
 
-/* Sentinel for infinite scroll */
-.sentinel { height: 1px; }
+/* Pagination */
+.pagination-wrapper {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+[data-view="list"] .pagination-wrapper {
+  max-width: 650px;
+}
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 16px 0;
+  flex-wrap: wrap;
+}
+.pagination-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+}
+.pagination-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.pagination-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.pagination-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+}
+.pagination-ellipsis {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+  color: var(--text-tertiary);
+  font-size: 14px;
+  user-select: none;
+}
 
 /* Responsive */
 @media (max-width: 768px) {
@@ -923,6 +979,10 @@ body {
   [data-view="list"] .list-actions { margin-left: 8px; }
   [data-view="list"] .list-header { gap: 4px; }
   [data-view="list"] .list-thumbnail { max-width: 100%; }
+  .pagination-wrapper { padding: 0 12px; }
+  .pagination { gap: 2px; }
+  .pagination-btn { min-width: 32px; height: 32px; padding: 0 8px; font-size: 13px; }
+  .pagination-ellipsis { min-width: 28px; height: 32px; }
 }
 </style>
 </head>
@@ -968,6 +1028,11 @@ body {
         <span class="search-shortcut">/</span>
       </div>
       <div class="header-controls">
+        <select class="sort-select" id="pageSizeSelect">
+          <option value="20" selected>20 per page</option>
+          <option value="50">50 per page</option>
+          <option value="100">100 per page</option>
+        </select>
         <select class="sort-select" id="sortSelect">
           <option value="newest">Newest first</option>
           <option value="oldest">Oldest first</option>
@@ -986,9 +1051,11 @@ body {
 
   <div class="stats-bar" id="statsBar"></div>
 
+  <div class="pagination-wrapper" id="paginationTop"></div>
+
   <main class="main" id="mainContent"></main>
 
-  <div class="sentinel" id="sentinel"></div>
+  <div class="pagination-wrapper" id="paginationBottom"></div>
 </div>
 
 <button class="scroll-top" id="scrollTopBtn" aria-label="Scroll to top">
@@ -1002,11 +1069,10 @@ body {
   // ── State ──
   let allBookmarks = [];
   let filteredBookmarks = [];
-  let renderedCount = 0;
-  const BATCH_SIZE = 50;
+  let currentPage = 1;
+  let pageSize = 20;
   let exportDate = '';
   let totalFromHeader = 0;
-  let observer = null;
   let searchTimeout = null;
   let viewMode = 'list';
 
@@ -1021,7 +1087,9 @@ body {
   const sortSelect = $('sortSelect');
   const statsBar = $('statsBar');
   const mainContent = $('mainContent');
-  const sentinel = $('sentinel');
+  const paginationTop = $('paginationTop');
+  const paginationBottom = $('paginationBottom');
+  const pageSizeSelect = $('pageSizeSelect');
   const scrollTopBtn = $('scrollTopBtn');
 
   // ── Avatar colors ──
@@ -1078,7 +1146,7 @@ body {
 
   function toggleViewMode() {
     setViewMode(viewMode === 'list' ? 'grid' : 'list');
-    if (allBookmarks.length) renderAll();
+    if (allBookmarks.length) renderCurrentPage();
   }
 
   // ── HTML entity decode ──
@@ -1504,28 +1572,113 @@ body {
     return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
-  // ── Render bookmarks in batches ──
-  function renderBatch() {
-    const fragment = document.createDocumentFragment();
-    const end = Math.min(renderedCount + BATCH_SIZE, filteredBookmarks.length);
+  // ── Pagination helpers ──
+  function getTotalPages() {
+    return Math.max(1, Math.ceil(filteredBookmarks.length / pageSize));
+  }
 
-    // Group by date for rendering
-    let lastDate = '';
-    // Get the last rendered date to avoid duplicate headers
-    const existingHeaders = mainContent.querySelectorAll('.date-group-label');
-    if (existingHeaders.length) {
-      lastDate = existingHeaders[existingHeaders.length - 1].textContent;
+  function getPageSlice() {
+    const start = (currentPage - 1) * pageSize;
+    return filteredBookmarks.slice(start, start + pageSize);
+  }
+
+  function goToPage(page) {
+    const total = getTotalPages();
+    page = Math.max(1, Math.min(page, total));
+    if (page === currentPage && mainContent.children.length) return;
+    currentPage = page;
+    renderCurrentPage();
+    syncPageToHash();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function syncPageToHash() {
+    const hash = currentPage > 1 ? '#page=' + currentPage : '';
+    history.replaceState(null, '', location.pathname + location.search + hash);
+  }
+
+  function readPageFromHash() {
+    const match = location.hash.match(/^#page=(\d+)$/);
+    if (match) {
+      currentPage = Math.max(1, Math.min(parseInt(match[1], 10), getTotalPages()));
+    } else {
+      currentPage = 1;
+    }
+  }
+
+  function buildPageNumbers(current, total) {
+    const pages = [];
+    const window_size = 2;
+    const rangeStart = Math.max(2, current - window_size);
+    const rangeEnd = Math.min(total - 1, current + window_size);
+
+    pages.push(1);
+    if (rangeStart > 2) pages.push('...');
+    for (let i = rangeStart; i <= rangeEnd; i++) pages.push(i);
+    if (rangeEnd < total - 1) pages.push('...');
+    if (total > 1) pages.push(total);
+
+    return pages;
+  }
+
+  function buildPaginationHtml() {
+    const total = getTotalPages();
+    if (total <= 1) return '';
+
+    const pages = buildPageNumbers(currentPage, total);
+    let html = '<nav class="pagination" aria-label="Pagination">';
+    html += '<button class="pagination-btn" data-page="' + (currentPage - 1) + '"' + (currentPage === 1 ? ' disabled' : '') + ' aria-label="Previous page">&lsaquo; Prev</button>';
+
+    for (const p of pages) {
+      if (p === '...') {
+        html += '<span class="pagination-ellipsis">&hellip;</span>';
+      } else {
+        html += '<button class="pagination-btn' + (p === currentPage ? ' active' : '') + '" data-page="' + p + '"' + (p === currentPage ? ' aria-current="page"' : '') + '>' + p + '</button>';
+      }
     }
 
+    html += '<button class="pagination-btn" data-page="' + (currentPage + 1) + '"' + (currentPage === total ? ' disabled' : '') + ' aria-label="Next page">Next &rsaquo;</button>';
+    html += '</nav>';
+    return html;
+  }
+
+  // ── Render current page ──
+  function renderCurrentPage() {
+    mainContent.innerHTML = '';
+
+    if (filteredBookmarks.length === 0) {
+      mainContent.innerHTML = '<div class="empty-state"><h3>No bookmarks found</h3><p>Try a different search term.</p></div>';
+      paginationTop.innerHTML = '';
+      paginationBottom.innerHTML = '';
+      updateStats();
+      return;
+    }
+
+    // Clamp currentPage
+    const total = getTotalPages();
+    if (currentPage > total) currentPage = total;
+
+    const slice = getPageSlice();
+    const fragment = document.createDocumentFragment();
+    let lastDate = '';
     let currentGrid = null;
 
-    for (let i = renderedCount; i < end; i++) {
-      const bm = filteredBookmarks[i];
+    // Detect if first item continues a date group from previous page
+    const pageStart = (currentPage - 1) * pageSize;
+    let prevPageLastDate = '';
+    if (pageStart > 0) {
+      prevPageLastDate = filteredBookmarks[pageStart - 1].dateGroup || '';
+    }
+
+    for (let i = 0; i < slice.length; i++) {
+      const bm = slice[i];
       if (bm.dateGroup && bm.dateGroup !== lastDate) {
         lastDate = bm.dateGroup;
         const label = document.createElement('div');
         label.className = 'date-group-label';
-        label.textContent = bm.dateGroup;
+        // Add "(continued)" if this group started on a previous page
+        const isContinuation = (i === 0 && bm.dateGroup === prevPageLastDate);
+        label.textContent = bm.dateGroup + (isContinuation ? ' (continued)' : '');
         fragment.appendChild(label);
         currentGrid = document.createElement('div');
         currentGrid.className = 'card-grid';
@@ -1533,52 +1686,28 @@ body {
       }
 
       if (!currentGrid) {
-        // First batch continues existing grid, or create new
-        const grids = mainContent.querySelectorAll('.card-grid');
-        if (grids.length) {
-          currentGrid = grids[grids.length - 1];
-        } else {
-          currentGrid = document.createElement('div');
-          currentGrid.className = 'card-grid';
-          fragment.appendChild(currentGrid);
-        }
+        currentGrid = document.createElement('div');
+        currentGrid.className = 'card-grid';
+        fragment.appendChild(currentGrid);
       }
 
       const wrapper = document.createElement('div');
       wrapper.innerHTML = renderCard(bm);
-      const cardEl = wrapper.firstChild;
-
-      // If currentGrid is already in DOM (from previous batch), append directly
-      if (currentGrid.parentNode === mainContent) {
-        currentGrid.appendChild(cardEl);
-      } else {
-        currentGrid.appendChild(cardEl);
-      }
+      currentGrid.appendChild(wrapper.firstChild);
     }
 
     mainContent.appendChild(fragment);
-    renderedCount = end;
+
+    const paginationHtml = buildPaginationHtml();
+    paginationTop.innerHTML = paginationHtml;
+    paginationBottom.innerHTML = paginationHtml;
     updateStats();
-  }
-
-  function renderAll() {
-    mainContent.innerHTML = '';
-    renderedCount = 0;
-
-    if (filteredBookmarks.length === 0) {
-      mainContent.innerHTML = '<div class="empty-state"><h3>No bookmarks found</h3><p>Try a different search term.</p></div>';
-      updateStats();
-      return;
-    }
-
-    renderBatch();
   }
 
   // ── Stats ──
   function updateStats() {
     const total = allBookmarks.length;
     const filtered = filteredBookmarks.length;
-    const showing = renderedCount;
 
     let dateRange = '';
     if (allBookmarks.length) {
@@ -1599,7 +1728,10 @@ body {
     if (isFiltered) {
       html += '<span class="stat-divider"></span><span class="stat"><strong>' + filtered + '</strong> matching</span>';
     }
-    html += '<span class="stat-divider"></span><span class="stat">Showing <strong>' + showing + '</strong> of ' + filtered + '</span>';
+    if (filtered > 0) {
+      const totalPages = getTotalPages();
+      html += '<span class="stat-divider"></span><span class="stat">Page <strong>' + currentPage + '</strong> of <strong>' + totalPages + '</strong></span>';
+    }
 
     statsBar.innerHTML = html;
   }
@@ -1616,7 +1748,9 @@ body {
         terms.every(t => bm._searchText.includes(t))
       );
     }
-    renderAll();
+    currentPage = 1;
+    renderCurrentPage();
+    syncPageToHash();
   }
 
   // ── Sort ──
@@ -1650,8 +1784,9 @@ body {
       filteredBookmarks = getSortedBookmarks();
       landing.style.display = 'none';
       app.classList.add('visible');
-      renderAll();
-      setupInfiniteScroll();
+      readPageFromHash();
+      renderCurrentPage();
+      setupPaginationListeners();
     };
     reader.readAsText(file);
   }
@@ -1681,15 +1816,16 @@ body {
     handleFile(fileInput.files[0]);
   });
 
-  // ── Infinite scroll ──
-  function setupInfiniteScroll() {
-    if (observer) observer.disconnect();
-    observer = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting && renderedCount < filteredBookmarks.length) {
-        renderBatch();
-      }
-    }, { rootMargin: '400px' });
-    observer.observe(sentinel);
+  // ── Pagination events ──
+  function setupPaginationListeners() {
+    function handlePaginationClick(e) {
+      const btn = e.target.closest('.pagination-btn');
+      if (!btn || btn.disabled) return;
+      const page = parseInt(btn.dataset.page, 10);
+      if (!isNaN(page)) goToPage(page);
+    }
+    paginationTop.addEventListener('click', handlePaginationClick);
+    paginationBottom.addEventListener('click', handlePaginationClick);
   }
 
   // ── Search debounce ──
@@ -1701,6 +1837,16 @@ body {
   // ── Sort change ──
   sortSelect.addEventListener('change', () => {
     performSearch(); // Re-filters with new sort
+  });
+
+  // ── Page size change ──
+  pageSizeSelect.addEventListener('change', () => {
+    pageSize = parseInt(pageSizeSelect.value, 10);
+    localStorage.setItem('bookmarks-viewer-pageSize', pageSize);
+    currentPage = 1;
+    renderCurrentPage();
+    syncPageToHash();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   });
 
   // ── Theme buttons ──
@@ -1731,6 +1877,17 @@ body {
       searchInput.blur();
       performSearch();
     }
+    // Pagination arrow keys (skip when in input/select/textarea)
+    const tag = document.activeElement.tagName;
+    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+    if (e.key === 'ArrowLeft' && allBookmarks.length) {
+      e.preventDefault();
+      goToPage(currentPage - 1);
+    }
+    if (e.key === 'ArrowRight' && allBookmarks.length) {
+      e.preventDefault();
+      goToPage(currentPage + 1);
+    }
   });
 
   // ── Scroll to top ──
@@ -1745,6 +1902,11 @@ body {
   // ── Init ──
   initTheme();
   initViewMode();
+  const savedPageSize = parseInt(localStorage.getItem('bookmarks-viewer-pageSize'), 10);
+  if ([20, 50, 100].includes(savedPageSize)) {
+    pageSize = savedPageSize;
+    pageSizeSelect.value = pageSize;
+  }
 })();
 </script>
 </body>

@@ -125,10 +125,12 @@ A standalone HTML viewer for browsing exported bookmarks visually. No server or 
 - Photo grids (1-4 images), video/GIF thumbnails with play overlay
 - Reply and quote tweet badges
 - External link display with domain names
-- Infinite scroll (loads 50 at a time)
+- Numbered pagination with prev/next controls (replaces infinite scroll)
+- Configurable page size (20, 50, or 100 per page) — persisted across sessions
+- URL hash persistence (`#page=N`) — bookmarkable page positions
 - Responsive layout (3-col → 2-col → 1-col in grid mode)
-- Keyboard shortcuts: `/` to focus search, `Escape` to clear
-- Stats bar with total count, date range, and filtered count
+- Keyboard shortcuts: `/` to focus search, `Escape` to clear, `←`/`→` arrow keys to navigate pages
+- Stats bar with total count, date range, filtered count, and current page
 
 ## Development
 

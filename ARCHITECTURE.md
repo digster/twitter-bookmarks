@@ -51,7 +51,7 @@ A standalone, self-contained HTML file for browsing exported bookmarks. Opens di
 - Single file (~30 KB) with inline CSS, JS, and SVG icons
 - Client-side markdown parser: line-by-line state machine that reverses the `markdown.py` rendering
 - File loading via drag-and-drop or file picker (`FileReader.readAsText()`)
-- Rendering pipeline: parse → filter/sort → batch render (50 cards per batch via `IntersectionObserver`)
+- Rendering pipeline: parse → filter/sort → paginated render (configurable page size: 20/50/100)
 - Theme system: CSS custom properties on `[data-theme]` attribute, persisted in `localStorage`
 - View mode system: `[data-view]` attribute on `<html>` (`list` or `grid`), persisted in `localStorage`
 - Search: pre-computed lowercase text per bookmark, AND logic for multi-word queries, 250ms debounce
@@ -61,8 +61,11 @@ A standalone, self-contained HTML file for browsing exported bookmarks. Opens di
 - List mode: compact rows with 2-line text clamp, inline media indicators (SVG + count), click-to-expand revealing full media/links
 - Grid mode: original card layout with full media grids, show-more text, card footer
 - Cards rendered as HTML strings (not DOM nodes) for performance with `innerHTML`
+- Pagination system: `goToPage()` → `renderCurrentPage()` → `buildPaginationHtml()` with URL hash persistence (`#page=N`) and keyboard navigation (arrow keys)
 - Event delegation on main content for list row expand/collapse (single listener for all cards)
+- Event delegation on pagination containers for page button clicks
 - Lazy image loading with `loading="lazy"` and `onerror` fallback
+- Page size and page position persisted via `localStorage` and URL hash
 - No external dependencies — fully offline-capable
 
 ## Key Directories
