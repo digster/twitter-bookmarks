@@ -271,6 +271,38 @@ def fetch(ctx, full, max_pages, output, count, delay, since, dump_raw):
 
 
 @main.command()
+@click.argument("input_file", type=click.Path(exists=True))
+@click.option("-o", "--output", type=click.Path(), default=None, help="Output CSV file path")
+def convert(input_file, output):
+    """Convert a bookmarks markdown file to CSV.
+
+    INPUT_FILE is the path to the markdown file to convert.
+    If -o is not specified, CSV is written to stdout.
+    """
+    from .converter import bookmarks_to_csv
+    from .markdown import parse_markdown_to_bookmarks
+
+    input_path = Path(input_file)
+    content = input_path.read_text(encoding="utf-8")
+    bookmarks = parse_markdown_to_bookmarks(content)
+
+    if not bookmarks:
+        click.echo("Error: No bookmarks found in input file.", err=True)
+        sys.exit(1)
+
+    click.echo(f"Parsed {len(bookmarks)} bookmarks.", err=True)
+
+    if output:
+        output_path = Path(output)
+        with open(output_path, "w", encoding="utf-8", newline="") as f:
+            bookmarks_to_csv(bookmarks, f)
+        click.echo(f"CSV written to {output_path}", err=True)
+    else:
+        csv_content = bookmarks_to_csv(bookmarks)
+        click.echo(csv_content, nl=False)
+
+
+@main.command()
 @click.pass_context
 def status(ctx):
     """Show current backup status."""

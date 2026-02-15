@@ -1,14 +1,15 @@
-"""Tests for the markdown renderer."""
+"""Tests for the markdown renderer and parser."""
 
 from datetime import datetime, timezone
 
 from twitter_bookmarks.markdown import (
     extract_ids_from_markdown,
     extract_latest_date,
+    parse_markdown_to_bookmarks,
     render_bookmarks_file,
     strip_legacy_headers,
 )
-from twitter_bookmarks.models import Bookmark, User
+from twitter_bookmarks.models import Bookmark, MediaItem, User
 
 
 class TestRenderBookmarksFile:
@@ -194,3 +195,169 @@ class TestExtractLatestDate:
         result = extract_latest_date(md)
         # sample_bookmarks[0] is Feb 10, 18:30 UTC (newest)
         assert result == datetime(2025, 2, 10, 18, 30, tzinfo=timezone.utc)
+
+
+class TestParseMarkdownToBookmarks:
+    def test_round_trip(self, sample_bookmarks):
+        """Parse rendered markdown and verify core fields are preserved."""
+        md = render_bookmarks_file(sample_bookmarks)
+        parsed = parse_markdown_to_bookmarks(md)
+        assert len(parsed) == len(sample_bookmarks)
+
+        # Build lookup by tweet_id for comparison
+        original = {b.tweet_id: b for b in sample_bookmarks}
+        for p in parsed:
+            o = original[p.tweet_id]
+            assert p.author.username == o.author.username
+            assert p.author.display_name == o.author.display_name
+            assert p.text == o.text
+            assert p.created_at == o.created_at
+            assert p.tweet_url == o.tweet_url
+            assert p.urls == o.urls
+            assert p.is_reply == o.is_reply
+            assert p.reply_to_user == o.reply_to_user
+            assert p.is_quote == o.is_quote
+            assert p.quoted_tweet_url == o.quoted_tweet_url
+
+    def test_round_trip_media(self, sample_bookmarks):
+        md = render_bookmarks_file(sample_bookmarks)
+        parsed = parse_markdown_to_bookmarks(md)
+        original = {b.tweet_id: b for b in sample_bookmarks}
+
+        for p in parsed:
+            o = original[p.tweet_id]
+            assert len(p.media) == len(o.media)
+            for pm, om in zip(p.media, o.media):
+                assert pm.type == om.type
+                assert pm.url == om.url
+                # expanded_url is lossy — not in markdown
+                assert pm.expanded_url == ""
+
+    def test_lossy_fields(self, sample_bookmarks):
+        """User.id and lang are not preserved in markdown."""
+        md = render_bookmarks_file(sample_bookmarks)
+        parsed = parse_markdown_to_bookmarks(md)
+        for p in parsed:
+            assert p.author.id == ""
+            assert p.lang == "en"
+
+    def test_empty_content(self):
+        assert parse_markdown_to_bookmarks("") == []
+        assert parse_markdown_to_bookmarks("   \n  ") == []
+
+    def test_no_trailing_separator(self):
+        """File without a trailing --- should still parse the last entry."""
+        content = (
+            "### @alice\n*Alice*\n\n> Hello world\n\n"
+            "- **Tweet:** [https://x.com/alice/status/1](https://x.com/alice/status/1)\n"
+            "- **Date:** 2025-01-01 12:00 UTC\n"
+            "- **ID:** 1\n"
+        )
+        parsed = parse_markdown_to_bookmarks(content)
+        assert len(parsed) == 1
+        assert parsed[0].author.username == "alice"
+        assert parsed[0].text == "Hello world"
+
+    def test_display_name_same_as_username(self):
+        """When display_name == username, renderer omits it; parser should default."""
+        content = (
+            "### @bob\n\n> Testing\n\n"
+            "- **Tweet:** [https://x.com/bob/status/2](https://x.com/bob/status/2)\n"
+            "- **Date:** 2025-01-01 12:00 UTC\n"
+            "- **ID:** 2\n\n---\n"
+        )
+        parsed = parse_markdown_to_bookmarks(content)
+        assert len(parsed) == 1
+        assert parsed[0].author.display_name == "bob"
+
+    def test_multi_line_text(self):
+        content = (
+            "### @writer\n*A Writer*\n\n"
+            "> First line\n> Second line\n> Third line\n\n"
+            "- **Tweet:** [https://x.com/writer/status/3](https://x.com/writer/status/3)\n"
+            "- **Date:** 2025-03-01 10:00 UTC\n"
+            "- **ID:** 3\n\n---\n"
+        )
+        parsed = parse_markdown_to_bookmarks(content)
+        assert parsed[0].text == "First line\nSecond line\nThird line"
+
+    def test_multiple_links(self):
+        content = (
+            "### @linker\n\n> Check these out\n\n"
+            "- **Tweet:** [https://x.com/linker/status/4](https://x.com/linker/status/4)\n"
+            "- **Date:** 2025-01-01 12:00 UTC\n"
+            "- **ID:** 4\n"
+            "- **Links:** [example.com/a](https://example.com/a), [foo.com/b](https://foo.com/b)\n\n---\n"
+        )
+        parsed = parse_markdown_to_bookmarks(content)
+        assert parsed[0].urls == ["https://example.com/a", "https://foo.com/b"]
+
+    def test_multiple_media(self):
+        content = (
+            "### @photog\n\n> Nice pics\n\n"
+            "- **Tweet:** [https://x.com/photog/status/5](https://x.com/photog/status/5)\n"
+            "- **Date:** 2025-01-01 12:00 UTC\n"
+            "- **ID:** 5\n"
+            "- **Media:** [photo](https://img1.jpg), [video](https://vid1.mp4)\n\n---\n"
+        )
+        parsed = parse_markdown_to_bookmarks(content)
+        assert len(parsed[0].media) == 2
+        assert parsed[0].media[0].type == "photo"
+        assert parsed[0].media[0].url == "https://img1.jpg"
+        assert parsed[0].media[1].type == "video"
+        assert parsed[0].media[1].url == "https://vid1.mp4"
+
+    def test_reply_bookmark(self):
+        content = (
+            "### @replier\n*Reply Person*\n\n> This is a reply\n\n"
+            "- **Tweet:** [https://x.com/replier/status/6](https://x.com/replier/status/6)\n"
+            "- **Date:** 2025-01-01 12:00 UTC\n"
+            "- **ID:** 6\n"
+            "- **Reply to:** @someone\n\n---\n"
+        )
+        parsed = parse_markdown_to_bookmarks(content)
+        assert parsed[0].is_reply is True
+        assert parsed[0].reply_to_user == "someone"
+
+    def test_quote_bookmark(self):
+        content = (
+            "### @quoter\n\n> Quoting this\n\n"
+            "- **Tweet:** [https://x.com/quoter/status/7](https://x.com/quoter/status/7)\n"
+            "- **Date:** 2025-01-01 12:00 UTC\n"
+            "- **ID:** 7\n"
+            "- **Quote of:** [https://x.com/orig/status/8](https://x.com/orig/status/8)\n\n---\n"
+        )
+        parsed = parse_markdown_to_bookmarks(content)
+        assert parsed[0].is_quote is True
+        assert parsed[0].quoted_tweet_url == "https://x.com/orig/status/8"
+
+    def test_legacy_headers_stripped(self):
+        """Legacy header lines should be ignored during parsing."""
+        content = (
+            "# Twitter/X Bookmarks\n\n"
+            "*Last updated: 2025-02-14 12:00 | 1 bookmarks*\n\n"
+            "## February 1, 2025\n\n"
+            "### @user\n*User*\n\n> Hello\n\n"
+            "- **Tweet:** [https://x.com/user/status/10](https://x.com/user/status/10)\n"
+            "- **Date:** 2025-02-01 12:00 UTC\n"
+            "- **ID:** 10\n\n---\n"
+        )
+        parsed = parse_markdown_to_bookmarks(content)
+        assert len(parsed) == 1
+        assert parsed[0].author.username == "user"
+
+    def test_multiple_entries(self):
+        content = (
+            "### @first\n*First*\n\n> Entry one\n\n"
+            "- **Tweet:** [https://x.com/first/status/100](https://x.com/first/status/100)\n"
+            "- **Date:** 2025-02-10 12:00 UTC\n"
+            "- **ID:** 100\n\n---\n\n"
+            "### @second\n*Second*\n\n> Entry two\n\n"
+            "- **Tweet:** [https://x.com/second/status/101](https://x.com/second/status/101)\n"
+            "- **Date:** 2025-02-09 12:00 UTC\n"
+            "- **ID:** 101\n\n---\n"
+        )
+        parsed = parse_markdown_to_bookmarks(content)
+        assert len(parsed) == 2
+        assert parsed[0].author.username == "first"
+        assert parsed[1].author.username == "second"

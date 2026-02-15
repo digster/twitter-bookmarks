@@ -78,6 +78,23 @@ uv run twitter-bookmarks fetch -o my-bookmarks.md
 uv run twitter-bookmarks -v fetch
 ```
 
+### Convert to CSV
+
+Convert an exported markdown file to CSV for use in spreadsheets, databases, or data analysis:
+
+```bash
+# Write to file
+uv run twitter-bookmarks convert bookmarks.md -o bookmarks.csv
+
+# Pipe to stdout
+uv run twitter-bookmarks convert bookmarks.md > bookmarks.csv
+
+# Pipe to other tools
+uv run twitter-bookmarks convert bookmarks.md | head -5
+```
+
+No auth or config required — pure local file operation. Multi-value fields (links, media) use `|` as separator.
+
 ### Check status
 
 ```bash

@@ -27,6 +27,15 @@ Read bookmarks.md ──→ extract_ids + extract_latest_date ──→ Fetch wi
                        (strip legacy headers)       (markdown.py)      (filter by known_ids)
 ```
 
+### Convert (`convert`)
+
+```
+bookmarks.md ──→ parse_markdown_to_bookmarks() ──→ bookmarks_to_csv() ──→ output.csv / stdout
+                  (markdown.py)                     (converter.py)
+```
+
+Pure local operation — no API access or auth required. The markdown parser is a line-by-line state machine (inverse of `render_bookmarks_file()`). Lossy fields not stored in markdown (`User.id`, `Bookmark.lang`, `MediaItem.expanded_url`) get default values.
+
 Early-stop triggers per-page: if **all** entries on a page are known IDs or older than the cutoff date, pagination stops. Both checks are conservative — unparseable data causes continuation rather than premature stopping.
 
 `processed_ids.json` is still maintained for the `status` command's count display, but the fetch command does not depend on it.
@@ -35,12 +44,13 @@ Early-stop triggers per-page: if **all** entries on a page are known IDs or olde
 
 | Module | Purpose |
 |--------|---------|
-| `cli.py` | Click CLI commands (setup, fetch, status). Orchestrates all modules. |
+| `cli.py` | Click CLI commands (setup, fetch, convert, status). Orchestrates all modules. |
 | `config.py` | TOML config at `~/.config/twitter-bookmarks/config.toml`. Stores auth tokens and optional `query_id` under `[api]`. |
 | `client.py` | Twitter GraphQL API client. Cookie auth, pagination with early-stop support (known IDs + date cutoff), error handling (including 404 stale query ID detection). Accepts per-instance `query_id`. |
 | `parser.py` | Parses deeply nested GraphQL JSON into `Bookmark` dataclasses. |
 | `models.py` | Dataclasses: `Bookmark`, `User`, `MediaItem`. |
-| `markdown.py` | Renders bookmark list to markdown. Also provides `extract_ids_from_markdown()`, `extract_latest_date()`, and `strip_legacy_headers()` for deriving state from the markdown file. |
+| `markdown.py` | Renders bookmark list to markdown and parses markdown back to `Bookmark` objects. Also provides `extract_ids_from_markdown()`, `extract_latest_date()`, `strip_legacy_headers()`, and `parse_markdown_to_bookmarks()`. |
+| `converter.py` | Converts `Bookmark` objects to CSV format. Used by the `convert` CLI command. |
 | `state.py` | Tracks processed tweet IDs (`.state/processed_ids.json`) for the `status` command. The fetch command derives state from the markdown file directly. |
 | `logging_config.py` | Logging setup with configurable verbosity. |
 

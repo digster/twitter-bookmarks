@@ -14,3 +14,6 @@
 ## 2026-02-14
 - Implement incremental bookmark fetching: early-stop pagination (known IDs + date cutoff), JSON bookmark store with merge, --since YYYY-MM-DD filter, auto-detect latest date from output file.
 - Fix incremental fetch: make bookmarks.md the source of truth. Remove JSON bookmark store. Derive known_ids and latest_date from markdown. Prepend-only flow for incremental mode. Remove header/date-group lines from output. Add `- **ID:** {tweet_id}` to each entry. Update viewer to derive dateGroup from date and parse ID line.
+
+## 2026-02-15
+- Add `convert` command (Markdown to CSV): parse_markdown_to_bookmarks() state machine parser in markdown.py, bookmarks_to_csv() in converter.py, `convert <input_file> [-o output.csv]` CLI command. No auth required — pure local file operation. Status to stderr, CSV to stdout or file.
