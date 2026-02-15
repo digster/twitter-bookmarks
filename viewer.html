@@ -1266,6 +1266,11 @@ body {
         continue;
       }
 
+      if (line.startsWith('- **ID:**')) {
+        current.tweetId = line.slice(9).trim();
+        continue;
+      }
+
       if (line.startsWith('- **Reply to:**')) {
         current.replyTo = line.slice(15).trim().replace(/^@/, '');
         continue;
@@ -1315,6 +1320,13 @@ body {
 
     // If no display name, use username
     if (!bm.displayName) bm.displayName = bm.username;
+
+    // Derive dateGroup from parsed date if no ## Date header was set
+    if (!bm.dateGroup && bm.date && !isNaN(bm.date.getTime())) {
+      bm.dateGroup = bm.date.toLocaleDateString('en-US', {
+        month: 'long', day: 'numeric', year: 'numeric'
+      });
+    }
 
     // Pre-compute search text
     bm._searchText = (bm.username + ' ' + bm.displayName + ' ' + bm.tweetText).toLowerCase();

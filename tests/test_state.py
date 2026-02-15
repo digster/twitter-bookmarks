@@ -1,9 +1,11 @@
 """Tests for the state manager."""
 
 import json
+from datetime import datetime, timezone
 
 import pytest
 
+from twitter_bookmarks.models import Bookmark, MediaItem, User
 from twitter_bookmarks.state import StateManager
 
 
@@ -66,3 +68,11 @@ class TestStateManager:
         assert "last_fetch" in data
         assert "total_processed" in data
         assert data["total_processed"] == 3
+
+    def test_processed_ids_property(self, state, sample_bookmarks):
+        state.mark_all_processed(sample_bookmarks)
+        ids = state.processed_ids
+        assert ids == {"1234567890", "9876543210", "5555555555"}
+        # Returns a copy, not a reference
+        ids.add("new_id")
+        assert "new_id" not in state.processed_ids

@@ -15,6 +15,7 @@ import logging
 import os
 import time
 from dataclasses import dataclass, field
+from datetime import datetime
 
 import httpx
 
@@ -185,6 +186,8 @@ class TwitterClient:
         max_pages: int = 50,
         delay: float = 0,
         max_count: int | None = None,
+        known_ids: set[str] | None = None,
+        since_date: datetime | None = None,
     ) -> list[dict]:
         """Fetch all bookmarks with automatic pagination.
 
@@ -193,6 +196,8 @@ class TwitterClient:
             max_pages: Maximum number of pages to fetch.
             delay: Seconds to sleep between pagination requests.
             max_count: Stop after collecting this many entries (None = all).
+            known_ids: Stop when all entries on a page are already known.
+            since_date: Stop when all entries on a page are older than this.
         """
         all_entries: list[dict] = []
         cursor: str | None = None
@@ -225,11 +230,85 @@ class TwitterClient:
                 all_entries = all_entries[:max_count]
                 break
 
+            # Early-stop: all entries on this page are already known
+            if known_ids and self._all_ids_known(page.entries, known_ids):
+                logger.info(
+                    "Stopping early — all %d entries on page %d are already known.",
+                    len(page.entries),
+                    page_num + 1,
+                )
+                break
+
+            # Early-stop: all entries on this page are older than since_date
+            if since_date and self._all_entries_older(page.entries, since_date):
+                logger.info(
+                    "Stopping early — all entries on page %d are older than %s.",
+                    page_num + 1,
+                    since_date.strftime("%Y-%m-%d"),
+                )
+                break
+
             cursor = page.cursor_bottom
             if not cursor:
                 break
 
         return all_entries
+
+    @staticmethod
+    def _all_ids_known(entries: list[dict], known_ids: set[str]) -> bool:
+        """Check if all tweet IDs on a page are in the known set."""
+        for entry in entries:
+            entry_id = entry.get("entryId", "")
+            if entry_id.startswith("tweet-"):
+                tweet_id = entry_id[len("tweet-"):]
+                if tweet_id not in known_ids:
+                    return False
+        return True
+
+    @staticmethod
+    def _all_entries_older(entries: list[dict], since_date: datetime) -> bool:
+        """Check if all entries on a page are older than since_date.
+
+        Extracts created_at from the nested raw entry dict without importing
+        parser logic. Returns False if any date cannot be parsed (conservative).
+        """
+        # Twitter date format: "Thu May 14 18:01:35 +0000 2020"
+        twitter_fmt = "%a %b %d %H:%M:%S %z %Y"
+        for entry in entries:
+            created_at_str = (
+                entry.get("content", {})
+                .get("itemContent", {})
+                .get("tweet_results", {})
+                .get("result", {})
+                .get("legacy", {})
+                .get("created_at", "")
+            )
+            if not created_at_str:
+                # Also try unwrapping TweetWithVisibilityResults
+                tweet = (
+                    entry.get("content", {})
+                    .get("itemContent", {})
+                    .get("tweet_results", {})
+                    .get("result", {})
+                    .get("tweet", {})
+                )
+                if tweet:
+                    created_at_str = tweet.get("legacy", {}).get("created_at", "")
+            if not created_at_str:
+                return False  # Can't parse → don't stop early
+            try:
+                entry_date = datetime.strptime(created_at_str, twitter_fmt)
+                # Make since_date timezone-aware if it isn't
+                if since_date.tzinfo is None:
+                    from datetime import timezone
+                    since_aware = since_date.replace(tzinfo=timezone.utc)
+                else:
+                    since_aware = since_date
+                if entry_date >= since_aware:
+                    return False  # At least one entry is newer
+            except ValueError:
+                return False  # Can't parse → don't stop early
+        return True
 
     def _parse_timeline_response(self, data: dict) -> BookmarksPage:
         """Extract tweet entries and cursors from GraphQL response."""

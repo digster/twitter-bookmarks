@@ -6,15 +6,30 @@ A Python CLI tool that backs up Twitter/X bookmarks to a single markdown file. U
 
 ## Data Flow
 
+**`bookmarks.md` is the source of truth.** No JSON state files are needed for correctness — known IDs and latest date are extracted directly from the markdown.
+
+### Full Fetch (`--full`)
+
 ```
 Twitter GraphQL API ──→ client.py ──→ parser.py ──→ markdown.py ──→ bookmarks.md
-      (httpx)         (raw JSON)    (Bookmark    (markdown
-                                     objects)     string)
-                                        │
-                                        ▼
-                                    state.py
-                                 (.state/processed_ids.json)
+      (httpx)         (raw JSON)    (Bookmark       (render all,
+                                     objects)        overwrite)
 ```
+
+### Incremental Fetch (default)
+
+```
+Read bookmarks.md ──→ extract_ids + extract_latest_date ──→ Fetch with early-stop
+                          (markdown.py helpers)                (known_ids + since_date)
+                                                                        │
+                                                                        ▼
+                       Prepend to bookmarks.md ←── Render new only ←── Dedup + Parse
+                       (strip legacy headers)       (markdown.py)      (filter by known_ids)
+```
+
+Early-stop triggers per-page: if **all** entries on a page are known IDs or older than the cutoff date, pagination stops. Both checks are conservative — unparseable data causes continuation rather than premature stopping.
+
+`processed_ids.json` is still maintained for the `status` command's count display, but the fetch command does not depend on it.
 
 ## Module Responsibilities
 
@@ -22,11 +37,11 @@ Twitter GraphQL API ──→ client.py ──→ parser.py ──→ markdown.p
 |--------|---------|
 | `cli.py` | Click CLI commands (setup, fetch, status). Orchestrates all modules. |
 | `config.py` | TOML config at `~/.config/twitter-bookmarks/config.toml`. Stores auth tokens and optional `query_id` under `[api]`. |
-| `client.py` | Twitter GraphQL API client. Cookie auth, pagination, error handling (including 404 stale query ID detection). Accepts per-instance `query_id`. |
+| `client.py` | Twitter GraphQL API client. Cookie auth, pagination with early-stop support (known IDs + date cutoff), error handling (including 404 stale query ID detection). Accepts per-instance `query_id`. |
 | `parser.py` | Parses deeply nested GraphQL JSON into `Bookmark` dataclasses. |
 | `models.py` | Dataclasses: `Bookmark`, `User`, `MediaItem`. |
-| `markdown.py` | Renders bookmark list to a single markdown file grouped by date. |
-| `state.py` | Tracks processed tweet IDs in `.state/processed_ids.json` for incremental fetches. |
+| `markdown.py` | Renders bookmark list to markdown. Also provides `extract_ids_from_markdown()`, `extract_latest_date()`, and `strip_legacy_headers()` for deriving state from the markdown file. |
+| `state.py` | Tracks processed tweet IDs (`.state/processed_ids.json`) for the `status` command. The fetch command derives state from the markdown file directly. |
 | `logging_config.py` | Logging setup with configurable verbosity. |
 
 ## Authentication

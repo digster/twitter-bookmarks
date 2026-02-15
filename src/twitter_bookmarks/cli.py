@@ -99,15 +99,22 @@ def setup(ctx, query_id_only):
     "--delay", type=float, default=None, help="Delay in seconds between API requests"
 )
 @click.option(
+    "--since",
+    type=str,
+    default=None,
+    help="Only include bookmarks after this date (YYYY-MM-DD) in output",
+)
+@click.option(
     "--dump-raw",
     type=click.Path(),
     default=None,
     help="Save raw API JSON response to file for debugging",
 )
 @click.pass_context
-def fetch(ctx, full, max_pages, output, count, delay, dump_raw):
+def fetch(ctx, full, max_pages, output, count, delay, since, dump_raw):
     """Fetch bookmarks and save to markdown."""
     import json as json_mod
+    from datetime import datetime, timezone
 
     config_path = ctx.obj["config_path"]
     if not config_exists(config_path):
@@ -122,7 +129,12 @@ def fetch(ctx, full, max_pages, output, count, delay, dump_raw):
 
     # Lazy imports so --help stays fast
     from .client import TwitterClient
-    from .markdown import render_bookmarks_file
+    from .markdown import (
+        extract_ids_from_markdown,
+        extract_latest_date,
+        render_bookmarks_file,
+        strip_legacy_headers,
+    )
     from .parser import parse_bookmarks
     from .state import StateManager
 
@@ -132,10 +144,42 @@ def fetch(ctx, full, max_pages, output, count, delay, dump_raw):
         click.echo("Full fetch mode — ignoring previous state.")
         state.reset()
 
+    # Parse --since date
+    since_date: datetime | None = None
+    if since:
+        try:
+            since_date = datetime.strptime(since, "%Y-%m-%d").replace(
+                tzinfo=timezone.utc
+            )
+        except ValueError:
+            click.echo("Error: --since must be in YYYY-MM-DD format.", err=True)
+            sys.exit(1)
+
+    # ── Derive early-stop parameters from existing markdown ──
+    existing_content = ""
+    known_ids: set[str] = set()
+    auto_since: datetime | None = None
+
+    if not full and output_path.exists():
+        existing_content = output_path.read_text(encoding="utf-8")
+        known_ids = extract_ids_from_markdown(existing_content)
+        if known_ids:
+            click.echo(f"Found {len(known_ids)} existing bookmarks in {output_path.name}")
+        if not since_date:
+            auto_since = extract_latest_date(existing_content)
+            if auto_since:
+                click.echo(
+                    f"Auto-detected latest bookmark date: "
+                    f"{auto_since.strftime('%Y-%m-%d %H:%M UTC')}"
+                )
+
+    early_stop_date = since_date or auto_since
+    early_stop_ids = known_ids if known_ids else None
+
     # Resolve delay: CLI flag > config > 0 (no delay)
     effective_delay = delay if delay is not None else config.fetch_delay
 
-    # Fetch from Twitter API
+    # ── Fetch from Twitter API ──
     click.echo("Fetching bookmarks from Twitter/X...")
     try:
         with TwitterClient(
@@ -148,6 +192,8 @@ def fetch(ctx, full, max_pages, output, count, delay, dump_raw):
                 max_pages=max_pages,
                 delay=effective_delay,
                 max_count=count,
+                known_ids=early_stop_ids,
+                since_date=early_stop_date,
             )
 
             # Dump raw API responses for debugging
@@ -170,25 +216,57 @@ def fetch(ctx, full, max_pages, output, count, delay, dump_raw):
     click.echo(f"Fetched {len(raw_entries)} raw entries.")
 
     # Parse into structured data
-    bookmarks = parse_bookmarks(raw_entries)
+    new_bookmarks = parse_bookmarks(raw_entries)
     if count is not None:
-        bookmarks = bookmarks[:count]
-    click.echo(f"Parsed {len(bookmarks)} valid bookmarks.")
+        new_bookmarks = new_bookmarks[:count]
+    click.echo(f"Parsed {len(new_bookmarks)} valid bookmarks.")
 
-    # Log new vs already-seen
-    new_bookmarks = state.filter_new(bookmarks)
-    if not full and not new_bookmarks:
+    if full:
+        # ── Full mode: render everything, overwrite ──
+        markdown = render_bookmarks_file(new_bookmarks)
+        output_path.write_text(markdown, encoding="utf-8")
+        click.echo(f"Wrote {len(new_bookmarks)} bookmarks to {output_path}")
+
+        state.mark_all_processed(new_bookmarks)
+        state.save()
+        return
+
+    # ── Incremental mode: dedup, prepend new ──
+    truly_new = [b for b in new_bookmarks if b.tweet_id not in known_ids]
+
+    # Apply --since filter to truly-new bookmarks
+    if since_date:
+        truly_new = [b for b in truly_new if b.created_at >= since_date]
+        click.echo(
+            f"Filtered to {len(truly_new)} bookmarks after {since}."
+        )
+
+    if not truly_new:
         click.echo("No new bookmarks since last fetch.")
+        state.mark_all_processed(new_bookmarks)
+        state.save()
+        return
+
+    click.echo(f"{len(truly_new)} new bookmarks.")
+
+    # Render only the new bookmarks (newest first)
+    new_markdown = render_bookmarks_file(truly_new)
+
+    # Strip legacy headers from existing content before prepending
+    cleaned_existing = strip_legacy_headers(existing_content)
+
+    # Prepend new + existing
+    if cleaned_existing.strip():
+        combined = new_markdown + "\n" + cleaned_existing
     else:
-        click.echo(f"{len(new_bookmarks)} new bookmarks.")
+        combined = new_markdown
 
-    # Always write the full set (API returns all bookmarks)
-    markdown = render_bookmarks_file(bookmarks)
-    output_path.write_text(markdown, encoding="utf-8")
-    click.echo(f"Wrote {len(bookmarks)} bookmarks to {output_path}")
+    output_path.write_text(combined, encoding="utf-8")
+    click.echo(
+        f"Prepended {len(truly_new)} new bookmarks to {output_path}"
+    )
 
-    # Update state
-    state.mark_all_processed(bookmarks)
+    state.mark_all_processed(new_bookmarks)
     state.save()
 
 

@@ -1,6 +1,13 @@
-"""Track processed bookmark IDs to support incremental fetches.
+"""Track processed bookmark IDs.
 
-State is stored in .state/processed_ids.json as a JSON object:
+State files in .state/:
+    processed_ids.json  — set of already-seen tweet IDs + metadata
+
+The fetch command derives early-stop parameters (known IDs, latest date)
+from the markdown file directly. This state manager is kept for the
+`status` command which reads processed_ids.json.
+
+processed_ids.json format:
     {
         "processed_ids": ["tweet_id_1", "tweet_id_2", ...],
         "last_fetch": "2025-01-15T14:30:00+00:00",
@@ -49,6 +56,11 @@ class StateManager:
 
     def is_processed(self, tweet_id: str) -> bool:
         return tweet_id in self._processed_ids
+
+    @property
+    def processed_ids(self) -> set[str]:
+        """Expose processed IDs for early-stop checks."""
+        return set(self._processed_ids)
 
     def filter_new(self, bookmarks: list[Bookmark]) -> list[Bookmark]:
         """Return only bookmarks not yet processed."""

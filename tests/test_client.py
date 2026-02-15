@@ -1,6 +1,7 @@
 """Tests for the Twitter API client."""
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -168,3 +169,109 @@ class TestTwitterClient:
             page = client.fetch_bookmarks_page()
 
         assert len(page.entries) == 3
+
+    @respx.mock
+    def test_known_ids_stops_when_all_known(self, fixture_response):
+        """Stop pagination when all entries on a page are already known."""
+        route = respx.get(GRAPHQL_URL)
+        route.mock(return_value=httpx.Response(200, json=fixture_response))
+
+        known = {"1234567890", "9876543210", "5555555555"}
+
+        with TwitterClient("auth", "ct0") as client:
+            entries = client.fetch_all_bookmarks(
+                max_pages=10, known_ids=known
+            )
+
+        # Fetches page 1, sees all IDs known, stops
+        assert route.call_count == 1
+        assert len(entries) == 3
+
+    @respx.mock
+    def test_known_ids_continues_when_partial(self, fixture_response, empty_response):
+        """Continue pagination when some entries are new."""
+        route = respx.get(GRAPHQL_URL)
+        route.side_effect = [
+            httpx.Response(200, json=fixture_response),
+            httpx.Response(200, json=empty_response),
+        ]
+
+        # Only one of three is known → should continue
+        known = {"1234567890"}
+
+        with TwitterClient("auth", "ct0") as client:
+            entries = client.fetch_all_bookmarks(
+                max_pages=10, known_ids=known
+            )
+
+        assert route.call_count == 2
+        assert len(entries) == 3
+
+    @respx.mock
+    def test_since_date_stops_when_all_older(self, fixture_response):
+        """Stop when all entries on a page are older than since_date."""
+        route = respx.get(GRAPHQL_URL)
+        route.mock(return_value=httpx.Response(200, json=fixture_response))
+
+        # All fixture entries are from Feb 8-10 2025
+        # Set since_date to after all of them
+        since = datetime(2025, 2, 11, 0, 0, 0, tzinfo=timezone.utc)
+
+        with TwitterClient("auth", "ct0") as client:
+            entries = client.fetch_all_bookmarks(
+                max_pages=10, since_date=since
+            )
+
+        assert route.call_count == 1
+        assert len(entries) == 3
+
+    @respx.mock
+    def test_since_date_continues_when_some_newer(self, fixture_response, empty_response):
+        """Continue when some entries are newer than since_date."""
+        route = respx.get(GRAPHQL_URL)
+        route.side_effect = [
+            httpx.Response(200, json=fixture_response),
+            httpx.Response(200, json=empty_response),
+        ]
+
+        # Feb 9 is between oldest (Feb 8) and newest (Feb 10)
+        since = datetime(2025, 2, 9, 0, 0, 0, tzinfo=timezone.utc)
+
+        with TwitterClient("auth", "ct0") as client:
+            entries = client.fetch_all_bookmarks(
+                max_pages=10, since_date=since
+            )
+
+        assert route.call_count == 2
+
+    @respx.mock
+    def test_no_early_stop_params_unchanged(self, fixture_response, empty_response):
+        """Without early-stop params, behavior is identical to before."""
+        route = respx.get(GRAPHQL_URL)
+        route.side_effect = [
+            httpx.Response(200, json=fixture_response),
+            httpx.Response(200, json=empty_response),
+        ]
+
+        with TwitterClient("auth", "ct0") as client:
+            entries = client.fetch_all_bookmarks(max_pages=10)
+
+        assert route.call_count == 2
+        assert len(entries) == 3
+
+    @respx.mock
+    def test_max_count_beats_early_stop(self, fixture_response):
+        """max_count triggers before early-stop gets a chance to check."""
+        route = respx.get(GRAPHQL_URL)
+        route.mock(return_value=httpx.Response(200, json=fixture_response))
+
+        known = {"1234567890", "9876543210", "5555555555"}
+
+        with TwitterClient("auth", "ct0") as client:
+            entries = client.fetch_all_bookmarks(
+                max_pages=10, max_count=2, known_ids=known
+            )
+
+        # max_count=2 truncates and stops before known_ids check
+        assert len(entries) == 2
+        assert route.call_count == 1

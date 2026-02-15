@@ -50,11 +50,14 @@ export TWITTER_BOOKMARKS_QUERY_ID=<new_id>
 ### Fetch bookmarks
 
 ```bash
-# Fetch and save to bookmarks.md
+# Incremental fetch (only fetches new bookmarks, merges with stored)
 uv run twitter-bookmarks fetch
 
 # Full re-fetch (ignore state, re-download all)
 uv run twitter-bookmarks fetch --full
+
+# Only include bookmarks after a specific date in output
+uv run twitter-bookmarks fetch --since 2025-02-01
 
 # Fetch only the 10 most recent bookmarks
 uv run twitter-bookmarks fetch --count 10
@@ -81,17 +84,22 @@ uv run twitter-bookmarks -v fetch
 uv run twitter-bookmarks status
 ```
 
+### Incremental fetching
+
+By default, `fetch` is incremental — it derives all state directly from the existing `bookmarks.md` file (no JSON state files needed for correctness). It uses two signals to stop early:
+
+- **Known IDs:** Extracted from `- **ID:**` lines (or `status/{id}` URLs for backward compat). If all entries on a page match known IDs, pagination stops.
+- **Date cutoff:** The first `**Date:**` line gives the latest bookmark date. If all entries on a page are older, pagination stops.
+
+New bookmarks are **prepended** to the existing file, preserving all existing content. The `--since` flag filters which new bookmarks get prepended.
+
+Use `--full` to re-fetch everything and rebuild the file from scratch.
+
 ## Output
 
-Bookmarks are saved to a single `bookmarks.md` file, grouped by date (newest first):
+Bookmarks are saved to a single `bookmarks.md` file (newest first, no headers):
 
 ```markdown
-# Twitter/X Bookmarks
-
-*Last updated: 2025-02-11 14:30 | 142 bookmarks*
-
-## February 10, 2025
-
 ### @simonw
 *Simon Willison*
 
@@ -99,10 +107,13 @@ Bookmarks are saved to a single `bookmarks.md` file, grouped by date (newest fir
 
 - **Tweet:** [link](https://x.com/simonw/status/123)
 - **Date:** 2025-02-10 18:30 UTC
+- **ID:** 123
 - **Links:** [example.com/...](https://example.com/article)
 
 ---
 ```
+
+Each bookmark includes a `- **ID:**` line with the tweet ID, used for deduplication on subsequent fetches.
 
 ## Viewer
 
